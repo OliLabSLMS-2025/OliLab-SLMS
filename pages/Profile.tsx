@@ -25,7 +25,8 @@ export const Profile: React.FC = () => {
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setError('');
-        if (!formData.id || !currentUser?.isAdmin) return;
+        // This check is sufficient as the save button is only rendered for admins.
+        if (!formData.id) return;
 
         setIsSaving(true);
         

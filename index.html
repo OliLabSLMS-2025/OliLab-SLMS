@@ -81,25 +81,72 @@
           display: none;
       }
     </style>
-  <script type="importmap">
+    <script src="./config.js"></script>
+  
+    <!-- Load Sucrase transpiler globally -->
+    <script src="https://unpkg.com/sucrase@3.35.0/dist/index.js"></script>
+    
+    <!-- Configure es-module-shims to use Sucrase for .ts/.tsx files -->
+    <script>
+      window.esmsInitOptions = {
+        async fetch(url, options) {
+          const resourceUrl = url.toString();
+          const isTsx = resourceUrl.endsWith('.tsx') || resourceUrl.endsWith('.ts');
+
+          if (isTsx) {
+            const response = await fetch(url, options);
+            if (!response.ok) return response;
+            const code = await response.text();
+
+            // Defensive check: if the server returns index.html for a script, don't try to parse it.
+            if (code.trim().startsWith('<!DOCTYPE html>')) {
+              console.error(`Failed to fetch script: ${url}. Received HTML instead.`);
+              return new Response(`console.error("Failed to load module: ${url}");`, {
+                headers: { 'Content-Type': 'application/javascript' },
+              });
+            }
+            
+            // Use the global `sucrase` object to transform the code
+            const transformedCode = window.sucrase.transform(code, {
+              transforms: ['typescript', 'jsx'],
+              production: true, // Important for React performance
+            }).code;
+            
+            return new Response(transformedCode, {
+              headers: { 'Content-Type': 'application/javascript' },
+            });
+          }
+
+          return fetch(url, options); // Use default fetch for all other files
+        }
+      };
+    </script>
+    
+    <!-- ES Module Shims for import maps -->
+    <script src="https://ga.jspm.io/npm:es-module-shims@1.10.0/dist/es-module-shims.js"></script>
+
+    <script type="importmap">
 {
   "imports": {
-    "react-router-dom": "https://esm.sh/react-router-dom@^7.8.0",
-    "recharts": "https://esm.sh/recharts@^3.1.2",
-    "react-dom/": "https://esm.sh/react-dom@^19.1.1/",
-    "react/": "https://esm.sh/react@^19.1.1/",
-    "react": "https://esm.sh/react@^19.1.1",
-    "@google/genai": "https://esm.sh/@google/genai@^1.13.0",
+    "react": "https://esm.sh/react@18.3.1",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "react-router-dom": "https://esm.sh/react-router-dom@6.25.1",
+    "recharts": "https://esm.sh/recharts@2.12.7",
+    "@google/genai": "https://esm.sh/@google/genai@0.14.0",
     "html5-qrcode": "https://esm.sh/html5-qrcode@2.3.8",
-    "firebase/": "https://aistudiocdn.com/firebase@^12.2.1/",
-    "qrcode": "https://esm.sh/qrcode@^1.5.3"
+    "qrcode": "https://esm.sh/qrcode@1.5.3",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "react/": "https://aistudiocdn.com/react@^19.1.1/"
   }
 }
 </script>
-</head>
-  <body class="bg-slate-900 text-slate-300">
+
+    <!-- App entry point -->
+    <script type="module-shim" src="./index.tsx"></script>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
-    <!-- Hidden container for QR code printing -->
     <div id="qr-print-area" class="qr-modal-print-container"></div>
   </body>
 </html>

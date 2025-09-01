@@ -2,14 +2,16 @@
 import { GoogleGenAI } from "@google/genai";
 import { Item, LogEntry, User } from '../types';
 
-if (!process.env.API_KEY) {
-  console.warn("API_KEY environment variable not set. AI features will not work.");
+let ai: GoogleGenAI | null = null;
+
+if (process.env.API_KEY && process.env.API_KEY.trim() !== "") {
+  ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+} else {
+  console.warn("API_KEY environment variable not set or is empty. AI features will not work.");
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || " " });
-
 export const generateInventoryReport = async (items: Item[], logs: LogEntry[], users: User[]): Promise<string> => {
-  if (!process.env.API_KEY) {
+  if (!ai) {
     return "Error: API_KEY is not configured. Please set the API_KEY environment variable to use this feature.";
   }
 
