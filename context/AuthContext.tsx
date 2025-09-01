@@ -63,7 +63,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const value = {
       currentUser,
-      firebaseUser: null, // This property is no longer used
       isAuthenticated: !!currentUser,
       isLoading,
       login,

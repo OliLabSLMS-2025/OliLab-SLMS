@@ -65,19 +65,6 @@ export const IconChevronRight = () => (
     </svg>
 );
 
-export const IconBrainCircuit = () => (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2a4.5 4.5 0 0 0-4.5 4.5v.143a4.5 4.5 0 0 0-3.357 6.714l-1.35 2.43A4.5 4.5 0 0 0 4.5 22h15a4.5 4.5 0 0 0 1.707-8.214l-1.35-2.43a4.5 4.5 0 0 0-3.357-6.714V6.5A4.5 4.5 0 0 0 12 2z"/>
-        <path d="M12 9a2.5 2.5 0 0 0-2.5 2.5v0a2.5 2.5 0 0 0 2.5 2.5h0a2.5 2.5 0 0 0 2.5-2.5v0A2.5 2.5 0 0 0 12 9z"/>
-        <path d="M12 14v8"/>
-        <path d="M17 18.5V22"/>
-        <path d="M7 18.5V22"/>
-        <path d="M12 2v3.5"/>
-        <path d="M7 6.5V2"/>
-        <path d="M17 6.5V2"/>
-    </svg>
-);
-
 export const IconLoader = ({ className }: { className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"

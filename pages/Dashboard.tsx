@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useInventory } from '../context/InventoryContext';
 import { generateInventoryReport } from '../services/geminiService';
-import { IconBrainCircuit, IconLoader, IconPrinter } from '../components/icons';
+import { IconLightbulb, IconLoader, IconPrinter } from '../components/icons';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { LogAction } from '../types';
 import { useAuth } from '../context/AuthContext';
-
+ 
 const StatCard: React.FC<{ title: string; value: string | number; description: string }> = ({ title, value, description }) => (
     <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 shadow-md print-bg-white print-text-black">
         <h3 className="text-sm font-medium text-slate-400 print-text-black">{title}</h3>
@@ -121,12 +121,21 @@ export const Dashboard: React.FC = () => {
                   <p className="text-slate-400 mt-1 print-text-black">Generate an intelligent summary of your lab's status.</p>
               </div>
               <button
-              onClick={handleGenerateReport}
-              disabled={isLoading}
-              className="flex items-center justify-center px-4 py-2 bg-emerald-600 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-700 transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed button-print-hide flex-shrink-0"
+                onClick={handleGenerateReport}
+                disabled={isLoading}
+                className="flex items-center justify-center px-4 py-2 bg-emerald-600 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-700 transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed button-print-hide flex-shrink-0"
               >
-              {isLoading ? <IconLoader className="mr-2" /> : <IconBrainCircuit />}
-              <span>{isLoading ? 'Generating...' : 'Generate Report'}</span>
+                {isLoading ? (
+                  <>
+                    <IconLoader className="h-5 w-5" />
+                    <span className="ml-2">Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <IconLightbulb />
+                    <span className="ml-2">Generate Report</span>
+                  </>
+                )}
               </button>
           </div>
 
