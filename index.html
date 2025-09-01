@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OliLab - Science Laboratory Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* For a more modern scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #1e293b;
+      }
+      ::-webkit-scrollbar-thumb {
+        background-color: #475569;
+        border-radius: 10px;
+        border: 2px solid #1e293b;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background-color: #64748b;
+      }
+
+      /* Print Styles */
+      @media print {
+        body {
+          background-color: white !important;
+          color: black !important;
+        }
+        .sidebar-print-hide, .button-print-hide {
+          display: none !important;
+        }
+        .main-content-print {
+          margin-left: 0 !important;
+          width: 100% !important;
+          min-height: auto !important;
+          background-color: white !important;
+        }
+        .print-text-black {
+            color: black !important;
+        }
+        .print-bg-white {
+            background-color: white !important;
+            border: 1px solid #ccc !important;
+        }
+        .prose-invert {
+            color: black !important;
+        }
+        .prose-invert h1, .prose-invert h2, .prose-invert h3, .prose-invert p, .prose-invert li {
+            color: black !important;
+        }
+
+        /* QR Code Specific Print Styles */
+        body.printing-qr #root > div {
+            display: none;
+        }
+        body.printing-qr .qr-modal-print-container {
+            display: block !important;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: white;
+            z-index: 9999;
+        }
+         body.printing-qr .qr-modal-print-content {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            width: 100%;
+        }
+      }
+
+      /* Hidden container for QR code printing */
+      .qr-modal-print-container {
+          display: none;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.8.0",
+    "recharts": "https://esm.sh/recharts@^3.1.2",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.1/",
+    "react/": "https://esm.sh/react@^19.1.1/",
+    "react": "https://esm.sh/react@^19.1.1",
+    "@google/genai": "https://esm.sh/@google/genai@^1.13.0",
+    "html5-qrcode": "https://esm.sh/html5-qrcode@2.3.8",
+    "firebase/": "https://aistudiocdn.com/firebase@^12.2.1/",
+    "qrcode": "https://esm.sh/qrcode@^1.5.3"
+  }
+}
+</script>
+</head>
+  <body class="bg-slate-900 text-slate-300">
+    <div id="root"></div>
+    <!-- Hidden container for QR code printing -->
+    <div id="qr-print-area" class="qr-modal-print-container"></div>
+  </body>
+</html>
