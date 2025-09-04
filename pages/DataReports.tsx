@@ -1,4 +1,5 @@
 
+
 import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { useInventory } from '../context/InventoryContext';
 import { IconDownload, IconPrinter, IconUpload, IconDeviceFloppy } from '../components/icons';
@@ -123,10 +124,25 @@ export const DataReports: React.FC = () => {
         const parsedData = parseCSV(text);
 
         const itemsToImport = parsedData.map(row => {
-            const totalQuantity = parseInt(row.totalQuantity, 10);
+            const keys = Object.keys(row);
+            // Helper to find a key case-insensitively and ignoring spaces, with multiple variations
+            const findKey = (variations: string[]) => 
+                keys.find(k => variations.includes(k.toLowerCase().replace(/\s+/g, '')));
+            
+            // Define possible header names for each required field
+            const nameKey = findKey(['name', 'itemname']);
+            const categoryKey = findKey(['category']);
+            const totalQuantityKey = findKey(['totalquantity', 'quantity', 'total']);
+
+            const name = nameKey ? row[nameKey] : '';
+            const category = categoryKey ? row[categoryKey] : '';
+            const totalQuantityStr = totalQuantityKey ? row[totalQuantityKey] : '0';
+
+            const totalQuantity = parseInt(totalQuantityStr, 10);
+            
             return {
-                name: row.name || '',
-                category: row.category || '',
+                name: name.trim(),
+                category: category.trim(),
                 totalQuantity: isNaN(totalQuantity) ? 0 : totalQuantity,
             };
         }).filter(item => item.name && item.category && item.totalQuantity > 0);
@@ -139,7 +155,7 @@ export const DataReports: React.FC = () => {
                 setImportStatus({ message: 'An error occurred during import.', type: 'error' });
             }
         } else {
-            setImportStatus({ message: 'No valid items found in the CSV file.', type: 'error' });
+            setImportStatus({ message: 'No valid items found in the CSV file. Please ensure it has columns for "name", "category", and "totalQuantity".', type: 'error' });
         }
         
         if (inventoryInputRef.current) {
