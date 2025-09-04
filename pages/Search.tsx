@@ -1,4 +1,6 @@
-import * as React from 'react';
+
+
+import React, { useState, useCallback } from 'react';
 import { QRScanner } from '../components/QRScanner';
 import { useInventory } from '../context/InventoryContext';
 import { Item } from '../types';
@@ -22,13 +24,13 @@ const InventoryProgressBar: React.FC<{ available: number; total: number }> = ({ 
 export const Search: React.FC = () => {
     const { state, requestBorrowItem } = useInventory();
     const { currentUser } = useAuth();
-    const [searchResults, setSearchResults] = React.useState<Item[]>([]);
-    const [searchQuery, setSearchQuery] = React.useState('');
-    const [hasSearched, setHasSearched] = React.useState(false);
-    const [isBorrowModalOpen, setBorrowModalOpen] = React.useState(false);
-    const [selectedItem, setSelectedItem] = React.useState<Item | null>(null);
-    const [borrowForm, setBorrowForm] = React.useState({ quantity: 1 });
-    const [borrowerId, setBorrowerId] = React.useState('');
+    const [searchResults, setSearchResults] = useState<Item[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [hasSearched, setHasSearched] = useState(false);
+    const [isBorrowModalOpen, setBorrowModalOpen] = useState(false);
+    const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+    const [borrowForm, setBorrowForm] = useState({ quantity: 1 });
+    const [borrowerId, setBorrowerId] = useState('');
 
     const handleOpenBorrowModal = (item: Item) => {
         setSelectedItem(item);
@@ -49,14 +51,14 @@ export const Search: React.FC = () => {
                     quantity: Number(borrowForm.quantity),
                 });
                 setBorrowModalOpen(false);
-                alert('Your borrow request has been submitted for approval.');
-              } catch (error: any) {
-                alert(`Failed to request item: ${error.message}`);
-              }
+                alert('Borrow request submitted successfully!');
+            } catch (error: any) {
+                alert(`Failed to submit request: ${error.message}`);
+            }
         }
     };
     
-    const handleSearch = React.useCallback((query: string) => {
+    const handleSearch = useCallback((query: string) => {
         setSearchQuery(query);
         setHasSearched(true);
         setSearchResults([]);
@@ -150,7 +152,7 @@ export const Search: React.FC = () => {
                                                             disabled={item.availableQuantity === 0}
                                                             className="font-medium text-emerald-400 hover:text-emerald-300 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors"
                                                         >
-                                                            Request Borrow
+                                                            Request
                                                         </button>
                                                     </td>
                                                 </tr>

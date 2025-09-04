@@ -1,8 +1,6 @@
 
 
-
-
-import { State, LogAction, BorrowStatus, UserStatus } from '../types';
+import { State, LogAction, LogStatus, UserStatus } from '../types';
 
 const LOCAL_STORAGE_KEY = 'oliLabLocalData';
 const SETTINGS_STORAGE_KEY = 'oliLabSettings';
@@ -11,7 +9,7 @@ const getDefaultData = (): State => {
     const defaultAdminId = `admin_${Date.now()}`;
     return {
         items: [
-            { id: 'item_1622548800000', name: 'Beaker 250ml', category: 'Chemistry', totalQuantity: 20, availableQuantity: 20 },
+            { id: 'item_1622548800000', name: 'Beaker 250ml', category: 'Chemistry', totalQuantity: 20, availableQuantity: 18 },
             { id: 'item_1622548800001', name: 'Test Tube Rack', category: 'Chemistry', totalQuantity: 15, availableQuantity: 15 },
             { id: 'item_1622548800002', name: 'Microscope', category: 'Biology', totalQuantity: 5, availableQuantity: 3 },
             { id: 'item_1622548800003', name: 'Sulfuric Acid (H2SO4)', category: 'Chemistry', totalQuantity: 10, availableQuantity: 10 },
@@ -28,16 +26,17 @@ const getDefaultData = (): State => {
                 section: null,
                 role: 'Admin',
                 isAdmin: true,
-                status: UserStatus.ACTIVE,
+                status: UserStatus.APPROVED,
             }
         ],
         logs: [
-             { id: 'log_1622548800002', userId: defaultAdminId, itemId: 'item_1622548800002', quantity: 2, timestamp: new Date(Date.now() - 86400000).toISOString(), action: LogAction.BORROW, status: BorrowStatus.ON_LOAN },
+             // FIX: Used LogAction enum member instead of a string literal to satisfy TypeScript.
+             { id: 'log_1622548800002', userId: defaultAdminId, itemId: 'item_1622548800002', quantity: 2, timestamp: new Date(Date.now() - 86400000).toISOString(), action: LogAction.BORROW, status: LogStatus.APPROVED, returnRequested: false },
+             { id: 'log_1622548800003', userId: defaultAdminId, itemId: 'item_1622548800000', quantity: 2, timestamp: new Date(Date.now() - 172800000).toISOString(), action: LogAction.BORROW, status: LogStatus.APPROVED, returnRequested: true },
         ],
         notifications: [],
         suggestions: [],
         comments: [],
-        logComments: [],
     };
 };
 
@@ -55,14 +54,11 @@ export const loadState = (): State => {
              if (!parsed.comments) {
                  parsed.comments = [];
              }
-             if (!parsed.logComments) {
-                parsed.logComments = [];
-             }
-             // Add status to existing users if it's missing
+             // For backward compatibility, add status to users if it doesn't exist
              parsed.users.forEach((user: any) => {
-                 if (!user.status) {
-                     user.status = UserStatus.ACTIVE;
-                 }
+                if (!user.status) {
+                    user.status = UserStatus.APPROVED; // Assume existing users are approved
+                }
              });
              return parsed;
         }
@@ -89,22 +85,10 @@ export const saveState = (state: State) => {
 export const loadSettings = () => {
     try {
         const serializedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
-        const defaultSettings = { 
-            title: 'OliLab', 
-            logoUrl: '', 
-            notifications: { enabled: false, permission: 'default' },
-            loanPeriodDays: 7 
-        };
-        const saved = serializedSettings ? JSON.parse(serializedSettings) : {};
-        return { ...defaultSettings, ...saved };
+        return serializedSettings ? JSON.parse(serializedSettings) : { title: 'OliLab', logoUrl: '' };
     } catch (err) {
          console.error("Could not load settings from local storage", err);
-         return { 
-             title: 'OliLab', 
-             logoUrl: '', 
-             notifications: { enabled: false, permission: 'default' },
-             loanPeriodDays: 7 
-        };
+         return { title: 'OliLab', logoUrl: '' };
     }
 }
 

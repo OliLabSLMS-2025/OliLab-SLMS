@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { User, UserStatus } from '../types';
 import { useInventory } from './InventoryContext';
 
@@ -8,28 +8,28 @@ interface AuthContextType {
   currentUser: SecureUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (identifier: string, password: string) => Promise<{ success: boolean; message: string }>;
+  login: (identifier: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
 
-const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const SESSION_STORAGE_KEY = 'oliLabLoggedInUserId';
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [currentUser, setCurrentUser] = React.useState<SecureUser | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [currentUser, setCurrentUser] = useState<SecureUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { state: inventoryState } = useInventory();
 
-  React.useEffect(() => {
+  useEffect(() => {
     try {
         const loggedInUserId = sessionStorage.getItem(SESSION_STORAGE_KEY);
         if (loggedInUserId) {
             const user = inventoryState.users.find(u => u.id === loggedInUserId);
-            if (user && user.status === UserStatus.ACTIVE) {
+            if (user && user.status === UserStatus.APPROVED) {
                 setCurrentUser(user);
             } else {
-                // User ID not found or user is not active, clear session
+                // User ID in session not found or user is not approved, clear session
                 sessionStorage.removeItem(SESSION_STORAGE_KEY);
             }
         }
@@ -40,7 +40,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [inventoryState.users]);
 
-  const login = async (identifier: string, password: string): Promise<{ success: boolean; message: string }> => {
+  const login = async (identifier: string, password: string): Promise<boolean> => {
     const identifierLower = identifier.toLowerCase().trim();
     const user = inventoryState.users.find(u => 
         u.email.toLowerCase() === identifierLower ||
@@ -48,25 +48,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         (u.lrn && u.lrn === identifier.trim())
     );
 
-    if (!user || user.password !== password) {
-      return { success: false, message: 'Invalid credentials. Please check your details and password.' };
-    }
-
-    if (user.status === UserStatus.PENDING) {
-        return { success: false, message: 'Your account is still pending approval by an administrator.' };
-    }
-    
-    if (user.status === UserStatus.DENIED) {
-        return { success: false, message: 'Your account application has been denied. Please contact an administrator.' };
-    }
-    
-    if (user.status === UserStatus.ACTIVE) {
+    if (user && user.password === password) {
+       if (user.status !== UserStatus.APPROVED) {
+            if (user.status === UserStatus.PENDING) {
+                throw new Error("Your account is pending approval by an administrator.");
+            }
+            if (user.status === UserStatus.DENIED) {
+                throw new Error("Your account registration has been denied.");
+            }
+            throw new Error("Your account is currently inactive. Please contact an administrator.");
+       }
       setCurrentUser(user);
       sessionStorage.setItem(SESSION_STORAGE_KEY, user.id);
-      return { success: true, message: 'Login successful' };
+      return true;
     }
-
-    return { success: false, message: 'An unexpected error occurred. Invalid account status.' };
+    return false;
   };
 
   const logout = () => {
@@ -90,7 +86,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 };
 
 export const useAuth = () => {
-  const context = React.useContext(AuthContext);
+  const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }

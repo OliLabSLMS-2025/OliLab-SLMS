@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { User } from '../types';
 import { useInventory } from '../context/InventoryContext';
 
@@ -9,12 +9,12 @@ interface UserSearchInputProps {
 
 export const UserSearchInput: React.FC<UserSearchInputProps> = ({ selectedUserId, onUserSelect }) => {
     const { state } = useInventory();
-    const [searchTerm, setSearchTerm] = React.useState('');
-    const [isSearching, setIsSearching] = React.useState(!selectedUserId);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isSearching, setIsSearching] = useState(!selectedUserId);
 
-    const selectedUser = React.useMemo(() => state.users.find(u => u.id === selectedUserId), [state.users, selectedUserId]);
+    const selectedUser = useMemo(() => state.users.find(u => u.id === selectedUserId), [state.users, selectedUserId]);
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (selectedUserId && !isSearching) {
             // If parent provides a default user, show it.
             setIsSearching(false);
@@ -24,7 +24,7 @@ export const UserSearchInput: React.FC<UserSearchInputProps> = ({ selectedUserId
         }
     }, [selectedUserId, isSearching]);
 
-    const filteredUsers = React.useMemo(() => {
+    const filteredUsers = useMemo(() => {
         if (!searchTerm.trim()) return [];
         const lowercasedFilter = searchTerm.toLowerCase();
         return state.users.filter(user =>

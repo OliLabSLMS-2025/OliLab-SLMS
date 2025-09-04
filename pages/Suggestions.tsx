@@ -1,8 +1,10 @@
-import * as React from 'react';
+
+
+import React, { useState, useMemo } from 'react';
 import { useInventory } from '../context/InventoryContext';
 import { useAuth } from '../context/AuthContext';
 import { Modal } from '../components/Modal';
-import { Suggestion, SuggestionStatus, Comment, User } from '../types';
+import { Suggestion, SuggestionStatus, Comment, User, SuggestionType } from '../types';
 import { IconPlusCircle, IconChevronDown, IconChevronUp } from '../components/icons';
 import { ITEM_CATEGORIES } from '../constants';
 
@@ -22,9 +24,9 @@ const SuggestionComments: React.FC<{
     currentUser: User;
 }> = ({ suggestion, currentUser }) => {
     const { state, addComment } = useInventory();
-    const [newCommentText, setNewCommentText] = React.useState('');
+    const [newCommentText, setNewCommentText] = useState('');
 
-    const commentsForSuggestion = React.useMemo(() => {
+    const commentsForSuggestion = useMemo(() => {
         return state.comments
             .filter(c => c.suggestionId === suggestion.id)
             .map(c => ({
@@ -52,25 +54,17 @@ const SuggestionComments: React.FC<{
         <div className="mt-4 pt-4 border-t border-slate-700/50">
             <h4 className="text-sm font-semibold text-slate-300 mb-2">Commentary</h4>
             <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
-                {commentsForSuggestion.length > 0 ? commentsForSuggestion.map(comment => {
-                    const isDenialReason = comment.text.startsWith('Denial Reason:');
-                    const denialText = isDenialReason ? comment.text.substring('Denial Reason:'.length).trim() : comment.text;
-
-                    return (
-                        <div key={comment.id} className={`text-xs p-3 rounded-md ${isDenialReason ? 'bg-red-900/40 border border-red-800/50' : 'bg-slate-900/70'}`}>
-                            <div className="flex justify-between items-center mb-1">
-                                <span className={`font-bold ${comment.user?.isAdmin ? 'text-emerald-400' : 'text-slate-200'}`}>
-                                    {comment.user?.fullName || 'Unknown User'}
-                                </span>
-                                <span className="text-slate-500">{new Date(comment.timestamp).toLocaleString()}</span>
-                            </div>
-                             <p className="text-slate-300 whitespace-pre-wrap">
-                                {isDenialReason && <strong className="text-red-400 block mb-1">Denial Reason</strong>}
-                                {denialText}
-                            </p>
+                {commentsForSuggestion.length > 0 ? commentsForSuggestion.map(comment => (
+                    <div key={comment.id} className="text-xs p-3 bg-slate-900/70 rounded-md">
+                        <div className="flex justify-between items-center mb-1">
+                            <span className={`font-bold ${comment.user?.isAdmin ? 'text-emerald-400' : 'text-slate-200'}`}>
+                                {comment.user?.fullName || 'Unknown User'}
+                            </span>
+                            <span className="text-slate-500">{new Date(comment.timestamp).toLocaleString()}</span>
                         </div>
-                    );
-                }) : <p className="text-xs text-slate-500">No comments yet.</p>}
+                        <p className="text-slate-300 whitespace-pre-wrap">{comment.text}</p>
+                    </div>
+                )) : <p className="text-xs text-slate-500">No comments yet.</p>}
             </div>
             {canComment && (
                  <form onSubmit={handleCommentSubmit} className="mt-4 flex gap-2">
@@ -90,26 +84,31 @@ const SuggestionComments: React.FC<{
 
 
 export const Suggestions: React.FC = () => {
-    const { state, addSuggestion, approveSuggestion, denySuggestion } = useInventory();
+    const { state, addSuggestion, approveItemSuggestion, approveFeatureSuggestion, denySuggestion } = useInventory();
     const { currentUser } = useAuth();
     
-    const [isSuggestModalOpen, setSuggestModalOpen] = React.useState(false);
-    const [suggestionForm, setSuggestionForm] = React.useState({ itemName: '', category: ITEM_CATEGORIES[0], reason: '' });
+    const [isSuggestModalOpen, setSuggestModalOpen] = useState(false);
+    const [suggestionType, setSuggestionType] = useState<SuggestionType>(SuggestionType.ITEM);
+    const [suggestionForm, setSuggestionForm] = useState({ title: '', description: '' });
     
-    const [isApproveModalOpen, setApproveModalOpen] = React.useState(false);
-    const [isDenyModalOpen, setDenyModalOpen] = React.useState(false);
-    const [selectedSuggestion, setSelectedSuggestion] = React.useState<Suggestion | null>(null);
-    const [approveQuantity, setApproveQuantity] = React.useState(10);
-    const [denialReason, setDenialReason] = React.useState('');
-    const [adminTab, setAdminTab] = React.useState<'pending' | 'processed'>('pending');
-    const [expandedSuggestionId, setExpandedSuggestionId] = React.useState<string | null>(null);
+    const [isApproveModalOpen, setApproveModalOpen] = useState(false);
+    const [isDenyModalOpen, setDenyModalOpen] = useState(false);
+    const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null);
+    const [approveForm, setApproveForm] = useState({ category: ITEM_CATEGORIES[0], quantity: 10 });
+    const [denyReason, setDenyReason] = useState('');
+    const [adminTab, setAdminTab] = useState<SuggestionType>(SuggestionType.ITEM);
+    const [expandedSuggestionId, setExpandedSuggestionId] = useState<string | null>(null);
 
     const handleSuggestSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!currentUser) return;
-        await addSuggestion({ ...suggestionForm, userId: currentUser.id });
+        await addSuggestion({
+            ...suggestionForm,
+            type: suggestionType,
+            userId: currentUser.id
+        });
         setSuggestModalOpen(false);
-        setSuggestionForm({ itemName: '', category: ITEM_CATEGORIES[0], reason: '' });
+        setSuggestionForm({ title: '', description: '' });
     };
 
     const openApproveModal = (suggestion: Suggestion) => {
@@ -120,8 +119,10 @@ export const Suggestions: React.FC = () => {
     const handleApproveSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedSuggestion) return;
-        await approveSuggestion({
-             suggestion: selectedSuggestion, totalQuantity: approveQuantity 
+        await approveItemSuggestion({
+             suggestionId: selectedSuggestion.id,
+             category: approveForm.category,
+             totalQuantity: approveForm.quantity,
         });
         setApproveModalOpen(false);
         setSelectedSuggestion(null);
@@ -129,32 +130,26 @@ export const Suggestions: React.FC = () => {
 
     const openDenyModal = (suggestion: Suggestion) => {
         setSelectedSuggestion(suggestion);
-        setDenialReason('');
         setDenyModalOpen(true);
     };
-    
-    const closeDenyModal = () => {
-        setDenyModalOpen(false);
-        setDenialReason('');
-        setSelectedSuggestion(null);
-    }
 
-    const handleDenyConfirm = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!selectedSuggestion || !currentUser || !denialReason.trim()) return;
-        await denySuggestion({
-            suggestionId: selectedSuggestion.id,
-            reason: denialReason,
-            adminId: currentUser.id
+    const handleDenyConfirm = async () => {
+        if (!selectedSuggestion || !denyReason.trim() || !currentUser) return;
+        await denySuggestion({ 
+            suggestionId: selectedSuggestion.id, 
+            reason: denyReason,
+            adminId: currentUser.id 
         });
-        closeDenyModal();
+        setDenyModalOpen(false);
+        setSelectedSuggestion(null);
+        setDenyReason('');
     };
 
     const toggleComments = (suggestionId: string) => {
         setExpandedSuggestionId(prev => (prev === suggestionId ? null : suggestionId));
     };
 
-    const mySuggestions = React.useMemo(() => {
+    const mySuggestions = useMemo(() => {
         if (!currentUser) return [];
         return state.suggestions
             .filter(s => s.userId === currentUser.id)
@@ -163,89 +158,93 @@ export const Suggestions: React.FC = () => {
     
     type SuggestionWithUser = Suggestion & { userName: string; commentCount: number; };
 
-    const { pendingSuggestions, processedSuggestions } = React.useMemo(() => {
-        const pending: SuggestionWithUser[] = [];
-        const processed: SuggestionWithUser[] = [];
-        
-        const suggestionsWithUser: SuggestionWithUser[] = state.suggestions.map(suggestion => {
+    const { itemSuggestions, featureSuggestions } = useMemo(() => {
+        const suggestionsWithDetails: SuggestionWithUser[] = state.suggestions.map(suggestion => {
             const user = state.users.find(u => u.id === suggestion.userId);
             const commentCount = state.comments.filter(c => c.suggestionId === suggestion.id).length;
             return { ...suggestion, userName: user?.fullName || 'Unknown User', commentCount };
+        }).sort((a, b) => {
+            // Pending first, then by date
+            if (a.status === SuggestionStatus.PENDING && b.status !== SuggestionStatus.PENDING) return -1;
+            if (a.status !== SuggestionStatus.PENDING && b.status === SuggestionStatus.PENDING) return 1;
+            return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
         });
 
-        suggestionsWithUser.forEach(s => {
-            if (s.status === SuggestionStatus.PENDING) {
-                pending.push(s);
-            } else {
-                processed.push(s);
-            }
-        });
-
-        pending.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-        processed.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-        return { pendingSuggestions: pending, processedSuggestions: processed };
+        return {
+            itemSuggestions: suggestionsWithDetails.filter(s => s.type === SuggestionType.ITEM),
+            featureSuggestions: suggestionsWithDetails.filter(s => s.type === SuggestionType.FEATURE),
+        };
     }, [state.suggestions, state.users, state.comments]);
 
     if (!currentUser) return null;
 
+    const AdminSuggestionList: React.FC<{ suggestions: SuggestionWithUser[] }> = ({ suggestions }) => (
+        <div className="space-y-4">
+            {suggestions.map(suggestion => (
+                <div key={suggestion.id} className="bg-slate-800 p-4 rounded-lg border border-slate-700 transition-all">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <div className="flex items-center gap-3">
+                                <h3 className="text-lg font-semibold text-white">{suggestion.title}</h3>
+                                <StatusBadge status={suggestion.status} />
+                            </div>
+                             {suggestion.type === SuggestionType.ITEM && suggestion.category &&
+                                <p className="text-sm text-slate-400">Category: {suggestion.category}</p>
+                            }
+                            <p className="text-sm text-slate-300 mt-2">Description: <span className="font-normal text-slate-400 whitespace-pre-wrap">{suggestion.description}</span></p>
+                            <p className="text-xs text-slate-500 mt-2">Suggested by {suggestion.userName} on {new Date(suggestion.timestamp).toLocaleDateString()}</p>
+                        </div>
+                        <div className="flex flex-col items-end gap-2 flex-shrink-0 ml-4">
+                             {suggestion.status === SuggestionStatus.PENDING && (
+                                <div className="flex gap-2">
+                                    {suggestion.type === SuggestionType.ITEM ? (
+                                        <button onClick={() => openApproveModal(suggestion)} className="px-3 py-1 bg-green-600 hover:bg-green-700 rounded-md text-sm font-semibold">Approve</button>
+                                    ) : (
+                                        <button onClick={() => approveFeatureSuggestion(suggestion.id)} className="px-3 py-1 bg-green-600 hover:bg-green-700 rounded-md text-sm font-semibold">Approve</button>
+                                    )}
+                                    <button onClick={() => openDenyModal(suggestion)} className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded-md text-sm font-semibold">Deny</button>
+                                </div>
+                            )}
+                            <button onClick={() => toggleComments(suggestion.id)} className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition-colors">
+                                <span>{suggestion.commentCount} Comments</span>
+                                {expandedSuggestionId === suggestion.id ? <IconChevronUp /> : <IconChevronDown />}
+                            </button>
+                        </div>
+                    </div>
+                    {expandedSuggestionId === suggestion.id && <SuggestionComments suggestion={suggestion} currentUser={currentUser} />}
+                </div>
+            ))}
+            {suggestions.length === 0 && <p className="text-slate-400 text-center py-8">No suggestions of this type.</p>}
+        </div>
+    );
+
     return (
         <div className="p-8">
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold text-white">Item Suggestions</h1>
-                {!currentUser.isAdmin && (
-                    <button onClick={() => setSuggestModalOpen(true)} className="flex items-center justify-center bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-emerald-700 transition-colors">
-                        <IconPlusCircle />
-                        Suggest New Item
-                    </button>
-                )}
+                <h1 className="text-3xl font-bold text-white">Suggestions</h1>
+                <button onClick={() => setSuggestModalOpen(true)} className="flex items-center justify-center bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-emerald-700 transition-colors">
+                    <IconPlusCircle />
+                    Make a Suggestion
+                </button>
             </div>
 
             {currentUser.isAdmin && (
                 <>
                     <div className="border-b border-slate-700 mb-6">
                         <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-                            <button onClick={() => setAdminTab('pending')} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${adminTab === 'pending' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500'}`}>
-                                Pending ({pendingSuggestions.length})
+                            <button onClick={() => setAdminTab(SuggestionType.ITEM)} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${adminTab === SuggestionType.ITEM ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500'}`}>
+                                Item Suggestions ({itemSuggestions.length})
                             </button>
-                            <button onClick={() => setAdminTab('processed')} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${adminTab === 'processed' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500'}`}>
-                                Processed
+                            <button onClick={() => setAdminTab(SuggestionType.FEATURE)} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${adminTab === SuggestionType.FEATURE ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500'}`}>
+                                Feature Suggestions ({featureSuggestions.length})
                             </button>
                         </nav>
                     </div>
 
-                    <div className="space-y-4">
-                        {(adminTab === 'pending' ? pendingSuggestions : processedSuggestions).map(suggestion => (
-                            <div key={suggestion.id} className="bg-slate-800 p-4 rounded-lg border border-slate-700 transition-all">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <div className="flex items-center gap-3">
-                                            <h3 className="text-lg font-semibold text-white">{suggestion.itemName}</h3>
-                                            <StatusBadge status={suggestion.status} />
-                                        </div>
-                                        <p className="text-sm text-slate-400">Category: {suggestion.category}</p>
-                                        <p className="text-sm text-slate-300 mt-2">Reason: <span className="font-normal text-slate-400 whitespace-pre-wrap">{suggestion.reason}</span></p>
-                                        <p className="text-xs text-slate-500 mt-2">Suggested by {suggestion.userName} on {new Date(suggestion.timestamp).toLocaleDateString()}</p>
-                                    </div>
-                                    <div className="flex flex-col items-end gap-2 flex-shrink-0 ml-4">
-                                         {suggestion.status === SuggestionStatus.PENDING && (
-                                            <div className="flex gap-2">
-                                                <button onClick={() => openApproveModal(suggestion)} className="px-3 py-1 bg-green-600 hover:bg-green-700 rounded-md text-sm font-semibold">Approve</button>
-                                                <button onClick={() => openDenyModal(suggestion)} className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded-md text-sm font-semibold">Deny</button>
-                                            </div>
-                                        )}
-                                        <button onClick={() => toggleComments(suggestion.id)} className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition-colors">
-                                            <span>{suggestion.commentCount} Comments</span>
-                                            {expandedSuggestionId === suggestion.id ? <IconChevronUp /> : <IconChevronDown />}
-                                        </button>
-                                    </div>
-                                </div>
-                                {expandedSuggestionId === suggestion.id && <SuggestionComments suggestion={suggestion} currentUser={currentUser} />}
-                            </div>
-                        ))}
-                         {adminTab === 'pending' && pendingSuggestions.length === 0 && <p className="text-slate-400 text-center py-8">No pending suggestions.</p>}
-                         {adminTab === 'processed' && processedSuggestions.length === 0 && <p className="text-slate-400 text-center py-8">No suggestions have been processed yet.</p>}
-                    </div>
+                    {adminTab === SuggestionType.ITEM ? 
+                        <AdminSuggestionList suggestions={itemSuggestions} /> : 
+                        <AdminSuggestionList suggestions={featureSuggestions} />
+                    }
                 </>
             )}
 
@@ -256,7 +255,8 @@ export const Suggestions: React.FC = () => {
                             <div className="flex justify-between items-start">
                                 <div>
                                     <div className="flex items-center gap-3 mb-1">
-                                        <h3 className="text-lg font-semibold text-white">{suggestion.itemName}</h3>
+                                        <h3 className="text-lg font-semibold text-white">{suggestion.title}</h3>
+                                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">{suggestion.type}</span>
                                         <StatusBadge status={suggestion.status} />
                                     </div>
                                     <p className="text-xs text-slate-500">Suggested on {new Date(suggestion.timestamp).toLocaleDateString()}</p>
@@ -268,7 +268,7 @@ export const Suggestions: React.FC = () => {
                             </div>
                             {expandedSuggestionId === suggestion.id && (
                                 <div className="mt-4 pt-4 border-t border-slate-700/50">
-                                     <p className="text-sm text-slate-300 mt-2">Reason: <span className="font-normal text-slate-400 whitespace-pre-wrap">{suggestion.reason}</span></p>
+                                     <p className="text-sm text-slate-300 mt-2">My Reason: <span className="font-normal text-slate-400 whitespace-pre-wrap">{suggestion.description}</span></p>
                                      <SuggestionComments suggestion={suggestion} currentUser={currentUser} />
                                 </div>
                             )}
@@ -283,13 +283,30 @@ export const Suggestions: React.FC = () => {
             )}
             
             {/* --- Modals --- */}
-            <Modal isOpen={isSuggestModalOpen} onClose={() => setSuggestModalOpen(false)} title="Suggest a New Item">
+            <Modal isOpen={isSuggestModalOpen} onClose={() => setSuggestModalOpen(false)} title="Make a Suggestion">
+                <div className="border-b border-slate-700 mb-4">
+                    <nav className="-mb-px flex space-x-4" aria-label="Tabs">
+                        <button onClick={() => setSuggestionType(SuggestionType.ITEM)} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${suggestionType === SuggestionType.ITEM ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400 hover:text-white'}`}>
+                            Suggest an Item
+                        </button>
+                        <button onClick={() => setSuggestionType(SuggestionType.FEATURE)} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${suggestionType === SuggestionType.FEATURE ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400 hover:text-white'}`}>
+                            Suggest a Feature
+                        </button>
+                    </nav>
+                </div>
                 <form onSubmit={handleSuggestSubmit} className="space-y-4">
-                    <input type="text" value={suggestionForm.itemName} onChange={e => setSuggestionForm(f => ({...f, itemName: e.target.value}))} placeholder="Item Name" required className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2.5" />
-                    <select value={suggestionForm.category} onChange={e => setSuggestionForm(f => ({...f, category: e.target.value}))} required className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2.5">
-                        {ITEM_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                    </select>
-                    <textarea value={suggestionForm.reason} onChange={e => setSuggestionForm(f => ({...f, reason: e.target.value}))} placeholder="Reason for suggesting, or other commentaries..." required rows={3} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2.5" />
+                    {suggestionType === SuggestionType.ITEM && (
+                        <>
+                            <input type="text" value={suggestionForm.title} onChange={e => setSuggestionForm(f => ({...f, title: e.target.value}))} placeholder="Item Name" required className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2.5" />
+                            <textarea value={suggestionForm.description} onChange={e => setSuggestionForm(f => ({...f, description: e.target.value}))} placeholder="Reason for suggesting this item..." required rows={3} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2.5" />
+                        </>
+                    )}
+                    {suggestionType === SuggestionType.FEATURE && (
+                         <>
+                            <input type="text" value={suggestionForm.title} onChange={e => setSuggestionForm(f => ({...f, title: e.target.value}))} placeholder="Feature Title (e.g., 'Dark Mode')" required className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2.5" />
+                            <textarea value={suggestionForm.description} onChange={e => setSuggestionForm(f => ({...f, description: e.target.value}))} placeholder="Describe the feature and why it would be useful..." required rows={3} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2.5" />
+                        </>
+                    )}
                     <div className="flex justify-end gap-3 pt-4">
                         <button type="button" onClick={() => setSuggestModalOpen(false)} className="py-2 px-4 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors">Cancel</button>
                         <button type="submit" className="py-2 px-4 bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors">Submit Suggestion</button>
@@ -297,12 +314,18 @@ export const Suggestions: React.FC = () => {
                 </form>
             </Modal>
 
-            <Modal isOpen={isApproveModalOpen} onClose={() => setApproveModalOpen(false)} title={`Approve: ${selectedSuggestion?.itemName}`}>
+            <Modal isOpen={isApproveModalOpen} onClose={() => setApproveModalOpen(false)} title={`Approve Item: ${selectedSuggestion?.title}`}>
                 <form onSubmit={handleApproveSubmit} className="space-y-4">
-                    <p>This will add the item to the inventory. Please specify the initial quantity.</p>
+                    <p>This will add the item to the inventory. Please assign a category and initial quantity.</p>
+                     <div>
+                        <label htmlFor="category" className="block mb-2 text-sm font-medium text-slate-300">Category</label>
+                        <select id="category" value={approveForm.category} onChange={(e) => setApproveForm(f => ({...f, category: e.target.value}))} required className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2.5">
+                            {ITEM_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        </select>
+                    </div>
                     <div>
                         <label htmlFor="quantity" className="block mb-2 text-sm font-medium text-slate-300">Total Quantity</label>
-                        <input type="number" id="quantity" value={approveQuantity} onChange={(e) => setApproveQuantity(parseInt(e.target.value, 10))} min="1" className="bg-slate-700 border border-slate-600 text-white text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block w-full p-2.5" required />
+                        <input type="number" id="quantity" value={approveForm.quantity} onChange={(e) => setApproveForm(f => ({...f, quantity: parseInt(e.target.value, 10)}))} min="1" className="bg-slate-700 border border-slate-600 text-white text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block w-full p-2.5" required />
                     </div>
                     <div className="flex justify-end gap-3 pt-4">
                         <button type="button" onClick={() => setApproveModalOpen(false)} className="py-2 px-4 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors">Cancel</button>
@@ -311,25 +334,13 @@ export const Suggestions: React.FC = () => {
                 </form>
             </Modal>
 
-            <Modal isOpen={isDenyModalOpen} onClose={closeDenyModal} title="Confirm Denial">
-                <form onSubmit={handleDenyConfirm}>
-                    <p className="text-slate-300">Are you sure you want to deny the suggestion for <strong className="text-white">{selectedSuggestion?.itemName}</strong>?</p>
-                     <div className="mt-4">
-                        <label htmlFor="denialReason" className="block mb-2 text-sm font-medium text-slate-300">Reason for Denial (Required)</label>
-                        <textarea 
-                            id="denialReason"
-                            value={denialReason}
-                            onChange={e => setDenialReason(e.target.value)}
-                            rows={3}
-                            className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2.5 text-sm focus:ring-emerald-500 focus:border-emerald-500"
-                            required
-                        />
-                    </div>
-                    <div className="flex justify-end gap-3 pt-6">
-                        <button type="button" onClick={closeDenyModal} className="py-2 px-4 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors">Cancel</button>
-                        <button type="submit" disabled={!denialReason.trim()} className="py-2 px-4 bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:bg-red-800 disabled:text-slate-400 disabled:cursor-not-allowed">Confirm Deny</button>
-                    </div>
-                </form>
+            <Modal isOpen={isDenyModalOpen} onClose={() => setDenyModalOpen(false)} title="Confirm Denial">
+                <p>Are you sure you want to deny the suggestion for <strong className="text-white">{selectedSuggestion?.title}</strong>?</p>
+                <textarea value={denyReason} onChange={e => setDenyReason(e.target.value)} placeholder="Provide a reason for denying this suggestion..." required rows={3} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2.5 mt-4" />
+                <div className="flex justify-end gap-3 pt-6">
+                    <button type="button" onClick={() => setDenyModalOpen(false)} className="py-2 px-4 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors">Cancel</button>
+                    <button onClick={handleDenyConfirm} disabled={!denyReason.trim()} className="py-2 px-4 bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:bg-slate-500 disabled:cursor-not-allowed">Confirm Deny</button>
+                </div>
             </Modal>
 
         </div>

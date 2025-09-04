@@ -1,11 +1,11 @@
-import * as React from 'react';
+
+
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 // FIX: Import State from types.ts where it has been centralized.
-import { Item, User, LogEntry, Notification, Suggestion, LogAction, SuggestionStatus, State, Comment, BorrowStatus, LogComment, UserStatus } from '../types';
+import { Item, User, LogEntry, Notification, Suggestion, LogAction, SuggestionStatus, State, Comment, LogStatus, UserStatus, SuggestionType } from '../types';
 import { IconLoader } from '../components/icons';
 import { loadState, saveState, generateId } from '../services/localStore';
-import { sendAccountStatusNotification, sendNewUserAdminNotification } from '../services/emailService';
-import { useSettings } from './SettingsContext';
-import { showSystemNotification } from '../services/notificationService';
+import { sendNewUserAdminNotification, sendAccountApprovedNotification, sendAccountDeniedNotification } from '../services/emailService';
 
 // State interface moved to types.ts to be shared across modules.
 
@@ -17,8 +17,8 @@ interface InventoryContextType {
   deleteItem: (itemId: string) => Promise<void>;
   requestBorrowItem: (payload: { userId: string; itemId: string; quantity: number }) => Promise<void>;
   approveBorrowRequest: (logId: string) => Promise<void>;
-  denyBorrowRequest: (logId: string) => Promise<void>;
-  approveReturnRequest: (log: LogEntry) => Promise<void>;
+  denyBorrowRequest: (payload: { logId: string; reason: string }) => Promise<void>;
+  returnItem: (payload: { borrowLog: LogEntry; adminNotes: string }) => Promise<void>;
   requestItemReturn: (payload: { log: LogEntry; item: Item; user: User }) => Promise<void>;
   createUser: (userData: Omit<User, 'id' | 'status'>) => Promise<string>;
   editUser: (userData: User) => Promise<void>;
@@ -26,27 +26,26 @@ interface InventoryContextType {
   approveUser: (userId: string) => Promise<void>;
   denyUser: (userId: string) => Promise<void>;
   markNotificationsAsRead: (notificationIds: string[]) => Promise<void>;
-  addSuggestion: (suggestionData: Omit<Suggestion, 'id' | 'status' | 'timestamp'>) => Promise<void>;
-  approveSuggestion: (payload: { suggestion: Suggestion; totalQuantity: number }) => Promise<void>;
+  addSuggestion: (suggestionData: Omit<Suggestion, 'id' | 'status' | 'timestamp' | 'category'>) => Promise<void>;
+  approveItemSuggestion: (payload: { suggestionId: string; category: string; totalQuantity: number }) => Promise<void>;
+  approveFeatureSuggestion: (suggestionId: string) => Promise<void>;
   denySuggestion: (payload: { suggestionId: string; reason: string; adminId: string }) => Promise<void>;
   importItems: (items: Omit<Item, 'id' | 'availableQuantity'>[]) => Promise<void>;
   addComment: (payload: { suggestionId: string; userId: string; text: string }) => Promise<void>;
-  addLogComment: (payload: { logId: string; userId: string; text: string }) => Promise<void>;
 }
 
-const InventoryContext = React.createContext<InventoryContextType | undefined>(undefined);
+const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
-export const InventoryProvider = ({ children }: { children: React.ReactNode }) => {
-  const [state, setState] = React.useState<State>(loadState());
-  const [isLoading, setIsLoading] = React.useState(true);
-  const { settings } = useSettings();
+export const InventoryProvider = ({ children }: { children: ReactNode }) => {
+  const [state, setState] = useState<State>(loadState());
+  const [isLoading, setIsLoading] = useState(true);
 
-  React.useEffect(() => {
+  useEffect(() => {
     // Persist state to local storage whenever it changes.
     saveState(state);
   }, [state]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     // Simulate initial loading
     setTimeout(() => setIsLoading(false), 500);
   }, []);
@@ -91,21 +90,21 @@ export const InventoryProvider = ({ children }: { children: React.ReactNode }) =
         id: newUserId,
         status: UserStatus.PENDING,
     };
-    setState(prevState => ({ ...prevState, users: [...prevState.users, newUser]}));
-    // Create a notification for admins
-    const newNotification: Notification = {
-        id: generateId('notif'),
-        message: `New user requires approval: ${newUser.fullName}`,
-        type: 'new_user_request',
-        read: false,
-        timestamp: new Date().toISOString(),
-    };
-     setState(prevState => {
-        const admins = prevState.users.filter(u => u.isAdmin && u.status === UserStatus.ACTIVE);
-        sendNewUserAdminNotification(newUser, admins);
-        showSystemNotification(settings.notifications.enabled, 'New User Request', { body: `User ${newUser.fullName} is awaiting approval.` });
-        return { ...prevState, notifications: [newNotification, ...prevState.notifications] };
-     });
+    setState(prevState => {
+      // Create a notification for admins
+      const newNotification: Notification = {
+          id: generateId('notif'),
+          message: `New user registration pending approval: ${newUser.fullName}`,
+          type: 'new_user',
+          read: false,
+          timestamp: new Date().toISOString(),
+      };
+      // Send email to admins
+      const admins = prevState.users.filter(u => u.isAdmin);
+      sendNewUserAdminNotification(newUser, admins);
+
+      return { ...prevState, users: [...prevState.users, newUser], notifications: [newNotification, ...prevState.notifications] };
+    });
      return newUserId;
   };
 
@@ -116,43 +115,63 @@ export const InventoryProvider = ({ children }: { children: React.ReactNode }) =
   const deleteUser: InventoryContextType['deleteUser'] = async (userId) => {
       setState(prevState => ({ ...prevState, users: prevState.users.filter(user => user.id !== userId)}));
   };
-
-  const approveUser: InventoryContextType['approveUser'] = async (userId) => {
-      setState(prevState => {
-          const userToUpdate = prevState.users.find(u => u.id === userId);
-          if (userToUpdate) {
-              const updatedUser = { ...userToUpdate, status: UserStatus.ACTIVE };
-              sendAccountStatusNotification(updatedUser);
-              return {
-                  ...prevState,
-                  users: prevState.users.map(user => user.id === userId ? updatedUser : user),
-              };
-          }
-          return prevState;
-      });
-  };
   
+  const approveUser: InventoryContextType['approveUser'] = async (userId) => {
+    setState(prevState => {
+        let approvedUser: User | undefined;
+        const newUsers = prevState.users.map(user => {
+            if (user.id === userId) {
+                approvedUser = { ...user, status: UserStatus.APPROVED };
+                return approvedUser;
+            }
+            return user;
+        });
+
+        if (approvedUser) {
+            sendAccountApprovedNotification(approvedUser);
+            // Optional: create an in-app notification for the user
+            const newNotification: Notification = {
+                id: generateId('notif'),
+                message: 'Welcome! Your account has been approved by an administrator.',
+                type: 'account_approved',
+                read: false,
+                timestamp: new Date().toISOString(),
+            };
+            // This is tricky as we don't have a user-specific notification system yet.
+            // For now, email is the primary notification channel.
+        }
+        
+        return { ...prevState, users: newUsers };
+    });
+  };
+
   const denyUser: InventoryContextType['denyUser'] = async (userId) => {
-      setState(prevState => {
-          const userToUpdate = prevState.users.find(u => u.id === userId);
-          if (userToUpdate) {
-              const updatedUser = { ...userToUpdate, status: UserStatus.DENIED };
-              sendAccountStatusNotification(updatedUser);
-              return {
-                  ...prevState,
-                  users: prevState.users.map(user => user.id === userId ? updatedUser : user),
-              };
-          }
-          return prevState;
-      });
+    setState(prevState => {
+        let deniedUser: User | undefined;
+        const newUsers = prevState.users.map(user => {
+            if (user.id === userId) {
+                deniedUser = { ...user, status: UserStatus.DENIED };
+                return deniedUser;
+            }
+            return user;
+        });
+
+        if (deniedUser) {
+            sendAccountDeniedNotification(deniedUser);
+        }
+        
+        return { ...prevState, users: newUsers };
+    });
   };
 
   const requestBorrowItem: InventoryContextType['requestBorrowItem'] = async ({ userId, itemId, quantity }) => {
     setState(prevState => {
         const item = prevState.items.find(i => i.id === itemId);
-        if (!item || item.availableQuantity < quantity) {
-            throw new Error('Not enough items in stock.');
+        const user = prevState.users.find(u => u.id === userId);
+        if (!item || !user || item.availableQuantity < quantity) {
+            throw new Error('Not enough items in stock or invalid user/item.');
         }
+
         const newLog: LogEntry = {
             id: generateId('log'),
             userId,
@@ -160,17 +179,18 @@ export const InventoryProvider = ({ children }: { children: React.ReactNode }) =
             quantity,
             timestamp: new Date().toISOString(),
             action: LogAction.BORROW,
-            status: BorrowStatus.PENDING,
+            status: LogStatus.PENDING,
         };
-        const user = prevState.users.find(u => u.id === userId);
+
         const newNotification: Notification = {
             id: generateId('notif'),
-            message: `${user?.fullName} requested to borrow ${quantity}x ${item.name}.`,
-            type: 'borrow_request',
+            message: `New borrow request from ${user.fullName} for ${quantity}x ${item.name}.`,
+            type: 'new_borrow_request',
             read: false,
             timestamp: new Date().toISOString(),
             relatedLogId: newLog.id,
         };
+
         return { ...prevState, logs: [newLog, ...prevState.logs], notifications: [newNotification, ...prevState.notifications] };
     });
   };
@@ -178,37 +198,49 @@ export const InventoryProvider = ({ children }: { children: React.ReactNode }) =
   const approveBorrowRequest: InventoryContextType['approveBorrowRequest'] = async (logId) => {
     setState(prevState => {
         const log = prevState.logs.find(l => l.id === logId);
-        if (!log || log.status !== BorrowStatus.PENDING) throw new Error("Log not found or not in pending state.");
-
+        if (!log || log.status !== LogStatus.PENDING) {
+            throw new Error('Log entry not found or not in pending state.');
+        }
         const item = prevState.items.find(i => i.id === log.itemId);
-        if (!item || item.availableQuantity < log.quantity) throw new Error("Not enough items in stock to approve.");
+        if (!item || item.availableQuantity < log.quantity) {
+            throw new Error('Not enough items in stock to approve this request.');
+        }
 
-        const approvalDate = new Date();
-        const dueDate = new Date(approvalDate);
-        dueDate.setDate(approvalDate.getDate() + (settings.loanPeriodDays || 7));
-
-        const newLogs = prevState.logs.map(l => 
-            l.id === logId 
-            ? { ...l, status: BorrowStatus.ON_LOAN, timestamp: approvalDate.toISOString(), dueDate: dueDate.toISOString() } 
-            : l
+        const newItems = prevState.items.map(i => 
+            i.id === log.itemId ? { ...i, availableQuantity: i.availableQuantity - log.quantity } : i
         );
-        const newItems = prevState.items.map(i => i.id === log.itemId ? { ...i, availableQuantity: i.availableQuantity - log.quantity } : i);
-
-        return { ...prevState, logs: newLogs, items: newItems };
+        const newLogs = prevState.logs.map(l =>
+            l.id === logId ? { ...l, status: LogStatus.APPROVED } : l
+        );
+        
+        // TODO: Could add a notification for the user here in future
+        
+        return { ...prevState, items: newItems, logs: newLogs };
     });
   };
 
-  const denyBorrowRequest: InventoryContextType['denyBorrowRequest'] = async (logId) => {
+  const denyBorrowRequest: InventoryContextType['denyBorrowRequest'] = async ({ logId, reason }) => {
     setState(prevState => {
-        const newLogs = prevState.logs.map(l => l.id === logId ? { ...l, status: BorrowStatus.DENIED } : l);
+        const log = prevState.logs.find(l => l.id === logId);
+        if (!log || log.status !== LogStatus.PENDING) {
+            throw new Error('Log entry not found or not in pending state.');
+        }
+        const newLogs = prevState.logs.map(l =>
+            l.id === logId ? { ...l, status: LogStatus.DENIED, adminNotes: reason } : l
+        );
+
+        // TODO: Could add a notification for the user here in future
+
         return { ...prevState, logs: newLogs };
     });
   };
 
-  const approveReturnRequest: InventoryContextType['approveReturnRequest'] = async (borrowLog) => {
+  const returnItem: InventoryContextType['returnItem'] = async ({ borrowLog, adminNotes }) => {
     setState(prevState => {
-        const newLogs = prevState.logs.map(l => l.id === borrowLog.id ? { ...l, status: BorrowStatus.RETURNED } : l);
+        // Update original borrow log status to RETURNED
+        let updatedLogs = prevState.logs.map(l => l.id === borrowLog.id ? { ...l, status: LogStatus.RETURNED } : l);
 
+        // Create a new RETURN log entry
         const returnLog: LogEntry = {
             id: generateId('log'),
             userId: borrowLog.userId,
@@ -217,8 +249,9 @@ export const InventoryProvider = ({ children }: { children: React.ReactNode }) =
             timestamp: new Date().toISOString(),
             action: LogAction.RETURN,
             relatedLogId: borrowLog.id,
+            adminNotes,
         };
-        newLogs.unshift(returnLog);
+        updatedLogs.unshift(returnLog);
 
         const newItems = prevState.items.map(i => {
             if (i.id === borrowLog.itemId) {
@@ -228,13 +261,13 @@ export const InventoryProvider = ({ children }: { children: React.ReactNode }) =
             return i;
         });
 
-        return { ...prevState, items: newItems, logs: newLogs };
+        return { ...prevState, items: newItems, logs: updatedLogs };
     });
   };
 
   const requestItemReturn: InventoryContextType['requestItemReturn'] = async ({ log, item, user }) => {
       setState(prevState => {
-          const newLogs = prevState.logs.map(l => l.id === log.id ? { ...l, status: BorrowStatus.RETURN_REQUESTED } : l);
+          const newLogs = prevState.logs.map(l => l.id === log.id ? { ...l, returnRequested: true } : l);
           const newNotification: Notification = {
               id: generateId('notif'),
               message: `${user.fullName} requested to return ${log.quantity}x ${item.name}.`,
@@ -264,37 +297,51 @@ export const InventoryProvider = ({ children }: { children: React.ReactNode }) =
     setState(prevState => ({ ...prevState, suggestions: [newSuggestion, ...prevState.suggestions] }));
   };
 
-  const approveSuggestion: InventoryContextType['approveSuggestion'] = async ({ suggestion, totalQuantity }) => {
+  const approveItemSuggestion: InventoryContextType['approveItemSuggestion'] = async ({ suggestionId, category, totalQuantity }) => {
     setState(prevState => {
-        const newSuggestions = prevState.suggestions.map(s => s.id === suggestion.id ? { ...s, status: SuggestionStatus.APPROVED } : s);
+        const suggestion = prevState.suggestions.find(s => s.id === suggestionId);
+        if (!suggestion || suggestion.type !== SuggestionType.ITEM) {
+            throw new Error("Suggestion not found or is not an item suggestion.");
+        }
+
+        const newSuggestions = prevState.suggestions.map(s => 
+            s.id === suggestionId 
+                ? { ...s, status: SuggestionStatus.APPROVED, category } 
+                : s
+        );
+
         const newItem: Item = {
             id: generateId('item'),
-            name: suggestion.itemName,
-            category: suggestion.category,
-            totalQuantity,
+            name: suggestion.title,
+            category: category,
+            totalQuantity: totalQuantity,
             availableQuantity: totalQuantity,
         };
+        
         return { ...prevState, suggestions: newSuggestions, items: [...prevState.items, newItem] };
     });
+  };
+
+  const approveFeatureSuggestion: InventoryContextType['approveFeatureSuggestion'] = async (suggestionId) => {
+    setState(prevState => ({
+        ...prevState,
+        suggestions: prevState.suggestions.map(s => 
+            s.id === suggestionId ? { ...s, status: SuggestionStatus.APPROVED } : s
+        ),
+    }));
   };
 
   const denySuggestion: InventoryContextType['denySuggestion'] = async ({ suggestionId, reason, adminId }) => {
     setState(prevState => {
         const newSuggestions = prevState.suggestions.map(s => s.id === suggestionId ? { ...s, status: SuggestionStatus.DENIED } : s);
-        
-        const denialComment: Comment = {
+        const newComment: Comment = {
             id: generateId('comment'),
             suggestionId,
             userId: adminId,
-            text: `Denial Reason: ${reason}`,
+            text: reason,
             timestamp: new Date().toISOString(),
         };
-
-        return { 
-            ...prevState, 
-            suggestions: newSuggestions, 
-            comments: [denialComment, ...prevState.comments] 
-        };
+        return { ...prevState, suggestions: newSuggestions, comments: [newComment, ...prevState.comments] };
     });
   };
   
@@ -318,18 +365,6 @@ export const InventoryProvider = ({ children }: { children: React.ReactNode }) =
     setState(prevState => ({ ...prevState, comments: [newComment, ...prevState.comments] }));
   };
 
-  const addLogComment: InventoryContextType['addLogComment'] = async ({ logId, userId, text }) => {
-    const newLogComment: LogComment = {
-      id: generateId('logcomment'),
-      logId,
-      userId,
-      text,
-      timestamp: new Date().toISOString(),
-    };
-    setState(prevState => ({ ...prevState, logComments: [newLogComment, ...prevState.logComments] }));
-  };
-
-
   const contextValue: InventoryContextType = {
       state,
       isLoading,
@@ -339,7 +374,7 @@ export const InventoryProvider = ({ children }: { children: React.ReactNode }) =
       requestBorrowItem,
       approveBorrowRequest,
       denyBorrowRequest,
-      approveReturnRequest,
+      returnItem,
       requestItemReturn,
       createUser,
       editUser,
@@ -348,16 +383,16 @@ export const InventoryProvider = ({ children }: { children: React.ReactNode }) =
       denyUser,
       markNotificationsAsRead,
       addSuggestion,
-      approveSuggestion,
+      approveItemSuggestion,
+      approveFeatureSuggestion,
       denySuggestion,
       importItems,
       addComment,
-      addLogComment,
   };
 
   if (isLoading) {
     return (
-        <div className="flex items-center justify-center h-screen bg-slate-100 dark:bg-slate-900">
+        <div className="flex items-center justify-center h-screen bg-slate-900">
             <IconLoader className="h-10 w-10 text-emerald-500" />
         </div>
     );
@@ -371,7 +406,7 @@ export const InventoryProvider = ({ children }: { children: React.ReactNode }) =
 };
 
 export const useInventory = () => {
-  const context = React.useContext(InventoryContext);
+  const context = useContext(InventoryContext);
   if (context === undefined) {
     throw new Error('useInventory must be used within an InventoryProvider');
   }

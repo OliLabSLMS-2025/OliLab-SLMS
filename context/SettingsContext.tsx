@@ -1,14 +1,9 @@
-import * as React from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { loadSettings, saveSettings } from '../services/localStore';
 
 interface Settings {
   title: string;
   logoUrl: string;
-  notifications: {
-    enabled: boolean;
-    permission: 'default' | 'granted' | 'denied';
-  };
-  loanPeriodDays: number;
 }
 
 interface SettingsContextType {
@@ -19,23 +14,14 @@ interface SettingsContextType {
 const defaultSettings: Settings = {
   title: 'OliLab',
   logoUrl: '',
-  notifications: {
-    enabled: false,
-    permission: 'default',
-  },
-  loanPeriodDays: 7,
 };
 
-const SettingsContext = React.createContext<SettingsContextType | undefined>(undefined);
+const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
-export const SettingsProvider = ({ children }: { children: React.ReactNode }) => {
-  const [settings, setSettings] = React.useState<Settings>(() => {
-      const saved = loadSettings();
-      // Merge saved settings with defaults to ensure new properties are added
-      return { ...defaultSettings, ...saved };
-  });
+export const SettingsProvider = ({ children }: { children: ReactNode }) => {
+  const [settings, setSettings] = useState<Settings>(() => loadSettings() || defaultSettings);
 
-  React.useEffect(() => {
+  useEffect(() => {
     saveSettings(settings);
   }, [settings]);
 
@@ -51,7 +37,7 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
 };
 
 export const useSettings = () => {
-  const context = React.useContext(SettingsContext);
+  const context = useContext(SettingsContext);
   if (context === undefined) {
     throw new Error('useSettings must be used within a SettingsProvider');
   }

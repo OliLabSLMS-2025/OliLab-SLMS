@@ -1,23 +1,18 @@
-import * as React from 'react';
+
+
+import React, { useMemo } from 'react';
 import { useInventory } from '../context/InventoryContext';
-import { LogAction, LogEntry, User, BorrowStatus } from '../types';
+import { LogAction, LogEntry, User, LogStatus } from '../types';
 import { IconPrinter } from '../components/icons';
 import { useAuth } from '../context/AuthContext';
-
-const isOverdue = (dueDate: string | undefined): boolean => {
-    if (!dueDate) return false;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Compare against the start of today
-    return today > new Date(dueDate);
-};
 
 const OverdueReminder: React.FC<{ overdueItems: { itemName: string }[] }> = ({ overdueItems }) => {
     if (overdueItems.length === 0) return null;
 
     return (
-        <div className="mb-6 p-4 bg-red-900/50 border border-red-700 text-red-300 text-sm rounded-lg button-print-hide">
-            <h3 className="font-bold text-base mb-2">Overdue Items Reminder</h3>
-            <p className="mb-2">The following items are past their due date. Please return them to the lab as soon as possible:</p>
+        <div className="mb-6 p-4 bg-yellow-900/50 border border-yellow-700 text-yellow-300 text-sm rounded-lg">
+            <h3 className="font-bold text-base mb-2">Weekly Return Reminder</h3>
+            <p className="mb-2">The following items were borrowed before last Friday and have not been returned. Please return them to the lab as soon as possible:</p>
             <ul className="list-disc list-inside space-y-1">
                 {overdueItems.map((item, index) => (
                     <li key={index}><strong>{item.itemName}</strong></li>
@@ -27,100 +22,74 @@ const OverdueReminder: React.FC<{ overdueItems: { itemName: string }[] }> = ({ o
     );
 };
 
-const DueDateDisplay: React.FC<{ log: LogEntry }> = ({ log }) => {
-    if (log.status !== BorrowStatus.ON_LOAN && log.status !== BorrowStatus.RETURN_REQUESTED && log.status !== BorrowStatus.RETURNED) {
-         return <span className="text-slate-500">N/A</span>;
-    }
-    if (!log.dueDate) {
-        return <span className="text-slate-500">N/A</span>;
-    }
+const StatusDisplay: React.FC<{ log: any }> = ({ log }) => {
+    const { requestItemReturn, state } = useInventory();
+    const { currentUser } = useAuth();
 
-    const overdue = isOverdue(log.dueDate);
-    return (
-        <div className="flex flex-col">
-            <span className={overdue && (log.status === BorrowStatus.ON_LOAN || log.status === BorrowStatus.RETURN_REQUESTED) ? 'text-red-400' : ''}>
-                {new Date(log.dueDate).toLocaleDateString()}
-            </span>
-            {overdue && (log.status === BorrowStatus.ON_LOAN || log.status === BorrowStatus.RETURN_REQUESTED) && (
-                 <span className="text-xs text-red-500 font-semibold">Overdue</span>
-            )}
-        </div>
-    );
-};
+    const handleRequestReturn = async (log: LogEntry) => {
+        if (!currentUser) return;
+        const item = state.items.find(i => i.id === log.itemId);
+        if (!item) {
+            console.error("Item not found for return request");
+            return;
+        }
+        await requestItemReturn({ log, item, user: currentUser as User });
+    };
 
-const StatusDisplay: React.FC<{ 
-    log: LogEntry & { itemName: string };
-    onReturn: (log: LogEntry) => void; 
-}> = ({ log, onReturn }) => {
     switch (log.status) {
-        case BorrowStatus.PENDING:
-            return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-700 text-gray-300 print-text-black">Pending Approval</span>;
-        case BorrowStatus.ON_LOAN:
+        case LogStatus.PENDING:
+            return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-900 text-blue-300 print-text-black">Pending Approval</span>;
+        case LogStatus.DENIED:
+            return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-900 text-red-300 print-text-black">Denied</span>;
+        case LogStatus.RETURNED:
+            return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-900 text-green-300 print-text-black">Returned</span>;
+        case LogStatus.APPROVED:
+        default: // Also handles legacy items without a status
+            if (log.returnRequested) {
+                return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-900 text-blue-300 print-text-black">Return Requested</span>;
+            }
             return (
                 <button 
-                    onClick={() => onReturn(log)}
-                    className="font-medium text-emerald-400 hover:text-emerald-300 transition-colors px-3 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-xs button-print-hide"
-                  >
+                    onClick={() => handleRequestReturn(log)}
+                    className="font-medium text-emerald-400 hover:text-emerald-300 transition-colors px-3 py-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-xs"
+                >
                     Request Return
-                  </button>
+                </button>
             );
-        case BorrowStatus.RETURN_REQUESTED:
-            return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-900 text-blue-300 print-text-black">Return Requested</span>;
-        case BorrowStatus.RETURNED:
-            return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-900 text-green-300 print-text-black">Returned</span>;
-        case BorrowStatus.DENIED:
-             return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-900 text-red-300 print-text-black">Request Denied</span>;
-        default:
-            // This case should ideally not be reached due to the normalization in `myLogs`.
-            // It acts as a fallback for any unexpected status.
-            return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-slate-700 text-slate-300 print-text-black">Unknown</span>;
     }
-}
-
+};
 
 export const MyBorrows: React.FC = () => {
-  const { state, requestItemReturn } = useInventory();
+  const { state } = useInventory();
   const { currentUser } = useAuth();
 
-  const myLogs = React.useMemo(() => {
+  const myLogs = useMemo(() => {
     if (!currentUser) return [];
-    
-    // This logic handles both new (status-based) and old (log-pairing based) return tracking for backward compatibility.
-    const returnedByActionLogIds = new Set(
-        state.logs.filter(log => log.userId === currentUser.id && log.action === LogAction.RETURN).map(log => log.relatedLogId)
-    );
 
     return state.logs
         .filter(log => log.userId === currentUser.id && log.action === LogAction.BORROW)
         .map(log => {
             const item = state.items.find(i => i.id === log.itemId);
-            const isLegacyReturned = returnedByActionLogIds.has(log.id);
+            const returnLog = state.logs.find(l => l.action === LogAction.RETURN && l.relatedLogId === log.id);
             return {
                 ...log,
                 itemName: item?.name || 'Unknown Item',
-                // Explicitly mark as returned if it's a legacy entry that has been returned
-                status: log.status ?? (isLegacyReturned ? BorrowStatus.RETURNED : BorrowStatus.ON_LOAN),
+                returnNotes: returnLog?.adminNotes,
             };
         })
         .sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [state.logs, state.items, currentUser]);
   
-  const overdueItems = React.useMemo(() => {
+  const overdueItems = useMemo(() => {
+    const today = new Date();
+    const lastFriday = new Date(today);
+    lastFriday.setDate(today.getDate() - (today.getDay() + 2) % 7);
+    lastFriday.setHours(0, 0, 0, 0);
+
     return myLogs.filter(log => 
-        (log.status === BorrowStatus.ON_LOAN || log.status === BorrowStatus.RETURN_REQUESTED) && isOverdue(log.dueDate)
+        log.status === LogStatus.APPROVED && new Date(log.timestamp) < lastFriday
     );
   }, [myLogs]);
-
-  const handleRequestReturn = async (log: LogEntry) => {
-    if (!currentUser) return;
-    const item = state.items.find(i => i.id === log.itemId);
-    if (!item) {
-        console.error("Item not found for return request");
-        return;
-    }
-    await requestItemReturn({ log, item, user: currentUser as User });
-    alert("Your return request has been submitted for admin approval.");
-  };
 
 
   return (
@@ -146,27 +115,32 @@ export const MyBorrows: React.FC = () => {
                 <th scope="col" className="px-6 py-3">Item Name</th>
                 <th scope="col" className="px-6 py-3">Quantity</th>
                 <th scope="col" className="px-6 py-3">Date</th>
-                <th scope="col" className="px-6 py-3">Due Date</th>
                 <th scope="col" className="px-6 py-3 text-center">Status</th>
               </tr>
             </thead>
             <tbody>
               {myLogs.map(log => (
-                <tr key={log.id} className="border-b border-slate-700 hover:bg-slate-700/30 transition-colors print-text-black">
-                  <td className="px-6 py-4 font-medium text-white print-text-black whitespace-nowrap">{log.itemName}</td>
-                  <td className="px-6 py-4">{log.quantity}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</td>
-                  <td className="px-6 py-4">
-                    <DueDateDisplay log={log} />
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <StatusDisplay log={log} onReturn={handleRequestReturn} />
-                  </td>
-                </tr>
+                <React.Fragment key={log.id}>
+                    <tr className="border-b border-slate-700 hover:bg-slate-700/30 transition-colors print-text-black">
+                    <td className="px-6 py-4 font-medium text-white print-text-black whitespace-nowrap">{log.itemName}</td>
+                    <td className="px-6 py-4">{log.quantity}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</td>
+                    <td className="px-6 py-4 text-center">
+                        <StatusDisplay log={log} />
+                    </td>
+                    </tr>
+                    {(log.adminNotes || log.returnNotes) && (
+                         <tr className="bg-slate-800/50 print-bg-white">
+                            <td colSpan={4} className="px-6 py-2 text-xs text-slate-400">
+                                <span className="font-semibold text-slate-300">Admin Note:</span> {log.adminNotes || log.returnNotes}
+                            </td>
+                         </tr>
+                    )}
+                </React.Fragment>
               ))}
               {myLogs.length === 0 && (
                 <tr>
-                    <td colSpan={5} className="text-center py-8 text-slate-400 print-text-black">You have not borrowed any items yet.</td>
+                    <td colSpan={4} className="text-center py-8 text-slate-400 print-text-black">You have not borrowed any items yet.</td>
                 </tr>
               )}
             </tbody>

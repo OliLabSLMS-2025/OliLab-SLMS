@@ -1,4 +1,4 @@
-import { User, UserStatus } from '../types';
+import { User } from '../types';
 
 /**
  * NOTE: This is a mock email service. In a real application, this would
@@ -53,7 +53,7 @@ export const sendProfileUpdateNotification = (user: User, changedByAdmin: boolea
 
 
 export const sendNewUserAdminNotification = (newUser: User, admins: User[]) => {
-    const subject = `[ACTION REQUIRED] New User Registration: ${newUser.fullName}`;
+    const subject = `New User Registration Pending Approval: ${newUser.fullName}`;
     const body = `
     Hello OliLab Administrators,
 
@@ -63,8 +63,11 @@ export const sendNewUserAdminNotification = (newUser: User, admins: User[]) => {
     - Full Name: ${newUser.fullName}
     - Username: ${newUser.username}
     - Email: ${newUser.email}
-    
-    Please visit the 'Users' page in the admin dashboard to review and approve their account.
+    - Role: ${newUser.role}
+    ${newUser.lrn ? `- LRN: ${newUser.lrn}` : ''}
+    ${newUser.gradeLevel ? `- Grade: ${newUser.gradeLevel} - ${newUser.section}` : ''}
+
+    Please visit the 'Users' page in the dashboard to approve or deny this registration request.
 
     Thank you,
     OliLab System
@@ -75,37 +78,33 @@ export const sendNewUserAdminNotification = (newUser: User, admins: User[]) => {
     });
 };
 
-export const sendAccountStatusNotification = (user: User) => {
-    let subject = '';
-    let body = '';
-
-    if (user.status === UserStatus.ACTIVE) {
-        subject = 'Your OliLab Account has been Approved!';
-        body = `
+export const sendAccountApprovedNotification = (user: User) => {
+    const subject = "Your OliLab Account Has Been Approved!";
+    const body = `
     Hi ${user.fullName},
 
-    Great news! Your account for the OliLab system has been approved by an administrator.
-    
-    You can now log in using your credentials.
+    Great news! Your registration for OliLab has been approved by an administrator.
+    You can now log in to your account and start using the system.
 
     Welcome aboard!
+
+    Thank you,
     The OliLab Team
     `;
-    } else if (user.status === UserStatus.DENIED) {
-        subject = 'Update on Your OliLab Account Application';
-        body = `
+    logEmail(user.email, subject, body);
+};
+
+
+export const sendAccountDeniedNotification = (user: User) => {
+    const subject = "Update on Your OliLab Account Registration";
+    const body = `
     Hi ${user.fullName},
 
-    Thank you for your interest in OliLab. After a review, your account application has been denied.
-    
-    If you believe this is a mistake, please contact a laboratory administrator.
+    Thank you for your interest in OliLab. After a review, we regret to inform you that your registration request has been denied at this time.
+    If you believe this was a mistake, please contact a laboratory administrator directly.
 
-    Regards,
+    Thank you,
     The OliLab Team
     `;
-    }
-
-    if (subject && body) {
-        logEmail(user.email, subject, body);
-    }
+    logEmail(user.email, subject, body);
 };
