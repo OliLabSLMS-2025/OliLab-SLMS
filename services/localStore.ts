@@ -1,5 +1,8 @@
 
-import { State, LogAction } from '../types';
+
+
+
+import { State, LogAction, BorrowStatus, UserStatus } from '../types';
 
 const LOCAL_STORAGE_KEY = 'oliLabLocalData';
 const SETTINGS_STORAGE_KEY = 'oliLabSettings';
@@ -25,15 +28,16 @@ const getDefaultData = (): State => {
                 section: null,
                 role: 'Admin',
                 isAdmin: true,
+                status: UserStatus.ACTIVE,
             }
         ],
         logs: [
-             // FIX: Used LogAction enum member instead of a string literal to satisfy TypeScript.
-             { id: 'log_1622548800002', userId: defaultAdminId, itemId: 'item_1622548800002', quantity: 2, timestamp: new Date(Date.now() - 86400000).toISOString(), action: LogAction.BORROW, returnRequested: false },
+             { id: 'log_1622548800002', userId: defaultAdminId, itemId: 'item_1622548800002', quantity: 2, timestamp: new Date(Date.now() - 86400000).toISOString(), action: LogAction.BORROW, status: BorrowStatus.ON_LOAN },
         ],
         notifications: [],
         suggestions: [],
         comments: [],
+        logComments: [],
     };
 };
 
@@ -51,6 +55,15 @@ export const loadState = (): State => {
              if (!parsed.comments) {
                  parsed.comments = [];
              }
+             if (!parsed.logComments) {
+                parsed.logComments = [];
+             }
+             // Add status to existing users if it's missing
+             parsed.users.forEach((user: any) => {
+                 if (!user.status) {
+                     user.status = UserStatus.ACTIVE;
+                 }
+             });
              return parsed;
         }
         const defaultDataOnParseError = getDefaultData();
@@ -76,10 +89,22 @@ export const saveState = (state: State) => {
 export const loadSettings = () => {
     try {
         const serializedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
-        return serializedSettings ? JSON.parse(serializedSettings) : { title: 'OliLab', logoUrl: '' };
+        const defaultSettings = { 
+            title: 'OliLab', 
+            logoUrl: '', 
+            notifications: { enabled: false, permission: 'default' },
+            loanPeriodDays: 7 
+        };
+        const saved = serializedSettings ? JSON.parse(serializedSettings) : {};
+        return { ...defaultSettings, ...saved };
     } catch (err) {
          console.error("Could not load settings from local storage", err);
-         return { title: 'OliLab', logoUrl: '' };
+         return { 
+             title: 'OliLab', 
+             logoUrl: '', 
+             notifications: { enabled: false, permission: 'default' },
+             loanPeriodDays: 7 
+        };
     }
 }
 

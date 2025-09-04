@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import * as React from 'react';
+// FIX: Updated react-router-dom imports for v5 compatibility. Replaced v6 components.
+import { HashRouter, Switch, Route, Redirect } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './pages/Dashboard';
 import { Inventory } from './pages/Inventory';
@@ -15,10 +16,11 @@ import { Profile } from './pages/Profile';
 import { SignUpPage } from './pages/SignUp';
 import { Suggestions } from './pages/Suggestions';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
+import { ThemeProvider } from './context/ThemeContext';
 
 const DynamicTitle = () => {
     const { settings } = useSettings();
-    useEffect(() => {
+    React.useEffect(() => {
         if (settings.title) {
             document.title = `${settings.title} - Science Laboratory Management`;
         }
@@ -26,10 +28,11 @@ const DynamicTitle = () => {
     return null; // This component does not render anything
 };
 
-const MainLayout: React.FC = () => {
-  const [isSidebarCollapsed, setSidebarCollapsed] = useState(window.innerWidth < 768);
+// FIX: Modified MainLayout to accept and render children for v5 routing.
+const MainLayout: React.FC = ({ children }) => {
+  const [isSidebarCollapsed, setSidebarCollapsed] = React.useState(window.innerWidth < 768);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 768) {
         setSidebarCollapsed(true);
@@ -48,56 +51,64 @@ const MainLayout: React.FC = () => {
   return (
     <div className="flex">
       <Sidebar isCollapsed={isSidebarCollapsed} onToggle={() => setSidebarCollapsed(prev => !prev)} />
-      <main className={`flex-1 min-h-screen main-content-print bg-slate-900 transition-all duration-300 ${isSidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
-          <Outlet />
+      <main className={`flex-1 min-h-screen main-content-print bg-slate-100 dark:bg-slate-900 transition-all duration-300 ${isSidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
+          {children}
       </main>
     </div>
   );
 };
 
-const ProtectedRoute: React.FC = () => {
-    const { isAuthenticated } = useAuth();
-    return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
-};
+// FIX: A component to handle routing logic, compatible with v5.
+const AppRoutes: React.FC = () => {
+  const { isAuthenticated, currentUser } = useAuth();
 
-const AdminRoute: React.FC = () => {
-    const { currentUser } = useAuth();
-    return currentUser?.isAdmin ? <Outlet /> : <Navigate to="/dashboard" replace />;
-}
+  // Unauthenticated users only see login/signup pages.
+  if (!isAuthenticated) {
+    return (
+      <Switch>
+        <Route path="/login" component={LoginPage} />
+        <Route path="/signup" component={SignUpPage} />
+        <Redirect to="/login" />
+      </Switch>
+    );
+  }
+
+  // Authenticated users see the main layout and protected routes.
+  return (
+    <MainLayout>
+      <Switch>
+        <Route path="/dashboard" component={Dashboard} />
+        <Route path="/inventory" component={Inventory} />
+        <Route path="/search" component={Search} />
+        <Route path="/profile" component={Profile} />
+        <Route path="/my-borrows" component={MyBorrows} />
+        <Route path="/suggestions" component={Suggestions} />
+        
+        {/* Admin Routes */}
+        <Route path="/log" render={() => currentUser?.isAdmin ? <BorrowLog /> : <Redirect to="/dashboard" />} />
+        <Route path="/users" render={() => currentUser?.isAdmin ? <Users /> : <Redirect to="/dashboard" />} />
+        <Route path="/reports" render={() => currentUser?.isAdmin ? <DataReports /> : <Redirect to="/dashboard" />} />
+        
+        <Redirect from="/" to="/dashboard" exact />
+        <Route path="*" render={() => <Redirect to="/dashboard" />} />
+      </Switch>
+    </MainLayout>
+  );
+};
 
 const App: React.FC = () => {
   return (
     <SettingsProvider>
-      <InventoryProvider>
-        <AuthProvider>
-          <HashRouter>
-            <DynamicTitle />
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/signup" element={<SignUpPage />} />
-              <Route element={<ProtectedRoute />}>
-                  <Route path="/" element={<MainLayout />}>
-                      <Route index element={<Navigate to="/dashboard" replace />} />
-                      <Route path="dashboard" element={<Dashboard />} />
-                      <Route path="inventory" element={<Inventory />} />
-                      <Route path="search" element={<Search />} />
-                      <Route path="profile" element={<Profile />} />
-                      <Route path="my-borrows" element={<MyBorrows />} />
-                      <Route path="suggestions" element={<Suggestions />} />
-                      
-                      <Route element={<AdminRoute />}>
-                          <Route path="log" element={<BorrowLog />} />
-                          <Route path="users" element={<Users />} />
-                          <Route path="reports" element={<DataReports />} />
-                      </Route>
-                      
-                      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                  </Route>
-              </Route>
-            </Routes>
-          </HashRouter>
-        </AuthProvider>
-      </InventoryProvider>
+      <ThemeProvider>
+        <InventoryProvider>
+          <AuthProvider>
+            <HashRouter>
+              <DynamicTitle />
+              <AppRoutes />
+            </HashRouter>
+          </AuthProvider>
+        </InventoryProvider>
+      </ThemeProvider>
     </SettingsProvider>
   );
 };

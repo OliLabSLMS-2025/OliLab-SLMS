@@ -1,8 +1,7 @@
-
-import React from 'react';
+import * as React from 'react';
 
 export const UserAgreement: React.FC = () => (
-    <div className="prose prose-sm prose-invert max-w-none max-h-[60vh] overflow-y-auto pr-4 text-slate-300">
+    <div className="prose prose-sm max-w-none max-h-[60vh] overflow-y-auto pr-4 text-slate-600 dark:text-slate-300 dark:prose-invert">
         <p>Last updated: {new Date().toLocaleDateString()}</p>
 
         <p>Welcome to OliLab! This User Agreement ("Agreement") is a legal contract between you and the laboratory management. By creating an account and using the OliLab Science Laboratory Management System ("Service"), you agree to be bound by the terms and conditions outlined below.</p>

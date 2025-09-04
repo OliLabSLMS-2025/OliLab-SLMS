@@ -1,6 +1,4 @@
-
-
-import React, { useState, useMemo } from 'react';
+import * as React from 'react';
 import { useInventory } from '../context/InventoryContext';
 import { useAuth } from '../context/AuthContext';
 import { Modal } from '../components/Modal';
@@ -24,9 +22,9 @@ const SuggestionComments: React.FC<{
     currentUser: User;
 }> = ({ suggestion, currentUser }) => {
     const { state, addComment } = useInventory();
-    const [newCommentText, setNewCommentText] = useState('');
+    const [newCommentText, setNewCommentText] = React.useState('');
 
-    const commentsForSuggestion = useMemo(() => {
+    const commentsForSuggestion = React.useMemo(() => {
         return state.comments
             .filter(c => c.suggestionId === suggestion.id)
             .map(c => ({
@@ -54,17 +52,25 @@ const SuggestionComments: React.FC<{
         <div className="mt-4 pt-4 border-t border-slate-700/50">
             <h4 className="text-sm font-semibold text-slate-300 mb-2">Commentary</h4>
             <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
-                {commentsForSuggestion.length > 0 ? commentsForSuggestion.map(comment => (
-                    <div key={comment.id} className="text-xs p-3 bg-slate-900/70 rounded-md">
-                        <div className="flex justify-between items-center mb-1">
-                            <span className={`font-bold ${comment.user?.isAdmin ? 'text-emerald-400' : 'text-slate-200'}`}>
-                                {comment.user?.fullName || 'Unknown User'}
-                            </span>
-                            <span className="text-slate-500">{new Date(comment.timestamp).toLocaleString()}</span>
+                {commentsForSuggestion.length > 0 ? commentsForSuggestion.map(comment => {
+                    const isDenialReason = comment.text.startsWith('Denial Reason:');
+                    const denialText = isDenialReason ? comment.text.substring('Denial Reason:'.length).trim() : comment.text;
+
+                    return (
+                        <div key={comment.id} className={`text-xs p-3 rounded-md ${isDenialReason ? 'bg-red-900/40 border border-red-800/50' : 'bg-slate-900/70'}`}>
+                            <div className="flex justify-between items-center mb-1">
+                                <span className={`font-bold ${comment.user?.isAdmin ? 'text-emerald-400' : 'text-slate-200'}`}>
+                                    {comment.user?.fullName || 'Unknown User'}
+                                </span>
+                                <span className="text-slate-500">{new Date(comment.timestamp).toLocaleString()}</span>
+                            </div>
+                             <p className="text-slate-300 whitespace-pre-wrap">
+                                {isDenialReason && <strong className="text-red-400 block mb-1">Denial Reason</strong>}
+                                {denialText}
+                            </p>
                         </div>
-                        <p className="text-slate-300 whitespace-pre-wrap">{comment.text}</p>
-                    </div>
-                )) : <p className="text-xs text-slate-500">No comments yet.</p>}
+                    );
+                }) : <p className="text-xs text-slate-500">No comments yet.</p>}
             </div>
             {canComment && (
                  <form onSubmit={handleCommentSubmit} className="mt-4 flex gap-2">
@@ -87,15 +93,16 @@ export const Suggestions: React.FC = () => {
     const { state, addSuggestion, approveSuggestion, denySuggestion } = useInventory();
     const { currentUser } = useAuth();
     
-    const [isSuggestModalOpen, setSuggestModalOpen] = useState(false);
-    const [suggestionForm, setSuggestionForm] = useState({ itemName: '', category: ITEM_CATEGORIES[0], reason: '' });
+    const [isSuggestModalOpen, setSuggestModalOpen] = React.useState(false);
+    const [suggestionForm, setSuggestionForm] = React.useState({ itemName: '', category: ITEM_CATEGORIES[0], reason: '' });
     
-    const [isApproveModalOpen, setApproveModalOpen] = useState(false);
-    const [isDenyModalOpen, setDenyModalOpen] = useState(false);
-    const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null);
-    const [approveQuantity, setApproveQuantity] = useState(10);
-    const [adminTab, setAdminTab] = useState<'pending' | 'processed'>('pending');
-    const [expandedSuggestionId, setExpandedSuggestionId] = useState<string | null>(null);
+    const [isApproveModalOpen, setApproveModalOpen] = React.useState(false);
+    const [isDenyModalOpen, setDenyModalOpen] = React.useState(false);
+    const [selectedSuggestion, setSelectedSuggestion] = React.useState<Suggestion | null>(null);
+    const [approveQuantity, setApproveQuantity] = React.useState(10);
+    const [denialReason, setDenialReason] = React.useState('');
+    const [adminTab, setAdminTab] = React.useState<'pending' | 'processed'>('pending');
+    const [expandedSuggestionId, setExpandedSuggestionId] = React.useState<string | null>(null);
 
     const handleSuggestSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -122,21 +129,32 @@ export const Suggestions: React.FC = () => {
 
     const openDenyModal = (suggestion: Suggestion) => {
         setSelectedSuggestion(suggestion);
+        setDenialReason('');
         setDenyModalOpen(true);
     };
-
-    const handleDenyConfirm = async () => {
-        if (!selectedSuggestion) return;
-        await denySuggestion(selectedSuggestion.id);
+    
+    const closeDenyModal = () => {
         setDenyModalOpen(false);
+        setDenialReason('');
         setSelectedSuggestion(null);
+    }
+
+    const handleDenyConfirm = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedSuggestion || !currentUser || !denialReason.trim()) return;
+        await denySuggestion({
+            suggestionId: selectedSuggestion.id,
+            reason: denialReason,
+            adminId: currentUser.id
+        });
+        closeDenyModal();
     };
 
     const toggleComments = (suggestionId: string) => {
         setExpandedSuggestionId(prev => (prev === suggestionId ? null : suggestionId));
     };
 
-    const mySuggestions = useMemo(() => {
+    const mySuggestions = React.useMemo(() => {
         if (!currentUser) return [];
         return state.suggestions
             .filter(s => s.userId === currentUser.id)
@@ -145,7 +163,7 @@ export const Suggestions: React.FC = () => {
     
     type SuggestionWithUser = Suggestion & { userName: string; commentCount: number; };
 
-    const { pendingSuggestions, processedSuggestions } = useMemo(() => {
+    const { pendingSuggestions, processedSuggestions } = React.useMemo(() => {
         const pending: SuggestionWithUser[] = [];
         const processed: SuggestionWithUser[] = [];
         
@@ -293,12 +311,25 @@ export const Suggestions: React.FC = () => {
                 </form>
             </Modal>
 
-            <Modal isOpen={isDenyModalOpen} onClose={() => setDenyModalOpen(false)} title="Confirm Denial">
-                <p>Are you sure you want to deny the suggestion for <strong className="text-white">{selectedSuggestion?.itemName}</strong>?</p>
-                <div className="flex justify-end gap-3 pt-6">
-                    <button type="button" onClick={() => setDenyModalOpen(false)} className="py-2 px-4 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors">Cancel</button>
-                    <button onClick={handleDenyConfirm} className="py-2 px-4 bg-red-600 hover:bg-red-700 rounded-lg transition-colors">Confirm Deny</button>
-                </div>
+            <Modal isOpen={isDenyModalOpen} onClose={closeDenyModal} title="Confirm Denial">
+                <form onSubmit={handleDenyConfirm}>
+                    <p className="text-slate-300">Are you sure you want to deny the suggestion for <strong className="text-white">{selectedSuggestion?.itemName}</strong>?</p>
+                     <div className="mt-4">
+                        <label htmlFor="denialReason" className="block mb-2 text-sm font-medium text-slate-300">Reason for Denial (Required)</label>
+                        <textarea 
+                            id="denialReason"
+                            value={denialReason}
+                            onChange={e => setDenialReason(e.target.value)}
+                            rows={3}
+                            className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2.5 text-sm focus:ring-emerald-500 focus:border-emerald-500"
+                            required
+                        />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-6">
+                        <button type="button" onClick={closeDenyModal} className="py-2 px-4 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors">Cancel</button>
+                        <button type="submit" disabled={!denialReason.trim()} className="py-2 px-4 bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:bg-red-800 disabled:text-slate-400 disabled:cursor-not-allowed">Confirm Deny</button>
+                    </div>
+                </form>
             </Modal>
 
         </div>

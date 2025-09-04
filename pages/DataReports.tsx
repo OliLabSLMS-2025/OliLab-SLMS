@@ -1,5 +1,4 @@
-
-import React, { useCallback, useRef, useState, useEffect } from 'react';
+import * as React from 'react';
 import { useInventory } from '../context/InventoryContext';
 import { IconDownload, IconPrinter, IconUpload, IconDeviceFloppy } from '../components/icons';
 import { Item, User } from '../types';
@@ -75,20 +74,21 @@ export const DataReports: React.FC = () => {
     const { state, importItems } = useInventory();
     const { settings, updateSettings } = useSettings();
 
-    const [importStatus, setImportStatus] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-    const [localSettings, setLocalSettings] = useState(settings);
-    const [saveStatus, setSaveStatus] = useState('');
+    const [importStatus, setImportStatus] = React.useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [localSettings, setLocalSettings] = React.useState(settings);
+    const [saveStatus, setSaveStatus] = React.useState('');
 
-    const inventoryInputRef = useRef<HTMLInputElement>(null);
+    const inventoryInputRef = React.useRef<HTMLInputElement>(null);
 
-    useEffect(() => {
+    React.useEffect(() => {
         setLocalSettings(settings);
     }, [settings]);
 
     const handleSettingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value, type } = e.target;
         setLocalSettings({
             ...localSettings,
-            [e.target.name]: e.target.value
+            [name]: type === 'number' ? parseInt(value, 10) : value
         });
     };
 
@@ -99,17 +99,17 @@ export const DataReports: React.FC = () => {
         setTimeout(() => setSaveStatus(''), 3000);
     };
 
-    const handleExportInventory = useCallback(() => {
+    const handleExportInventory = React.useCallback(() => {
         const csvData = convertToCSV(state.items);
         downloadCSV(csvData, 'olilab_inventory.csv');
     }, [state.items]);
 
-    const handleExportUsers = useCallback(() => {
+    const handleExportUsers = React.useCallback(() => {
         const csvData = convertToCSV(state.users);
         downloadCSV(csvData, 'olilab_users.csv');
     }, [state.users]);
 
-    const handleExportLogs = useCallback(() => {
+    const handleExportLogs = React.useCallback(() => {
         const csvData = convertToCSV(state.logs);
         downloadCSV(csvData, 'olilab_logs.csv');
     }, [state.logs]);
@@ -145,6 +145,36 @@ export const DataReports: React.FC = () => {
         if (inventoryInputRef.current) {
             inventoryInputRef.current.value = '';
         }
+    };
+
+    const handleEnableNotifications = async () => {
+        if (!('Notification' in window)) {
+            alert('This browser does not support desktop notifications.');
+            return;
+        }
+
+        const permission = await Notification.requestPermission();
+        updateSettings({
+            notifications: {
+                permission: permission,
+                enabled: permission === 'granted'
+            }
+        });
+    };
+
+    const renderNotificationStatus = () => {
+        const { permission, enabled } = settings.notifications;
+        if (permission === 'granted' && enabled) {
+            return <p className="text-sm text-green-400">Desktop notifications are enabled.</p>;
+        }
+        if (permission === 'denied') {
+            return <p className="text-sm text-yellow-400">Notifications blocked. Please enable them in your browser settings.</p>;
+        }
+        return (
+             <button onClick={handleEnableNotifications} className="px-4 py-2 bg-slate-600 text-white font-semibold rounded-lg shadow-md hover:bg-slate-700 transition-colors">
+                Enable Desktop Notifications
+            </button>
+        );
     };
     
     return (
@@ -192,26 +222,47 @@ export const DataReports: React.FC = () => {
                 </div>
 
                 {/* Settings */}
-                <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
+                <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 flex flex-col">
                     <h2 className="text-xl font-semibold text-white mb-4">System Settings</h2>
-                    <p className="text-slate-400 mb-6">Customize the title and logo of the application.</p>
-                    <form className="space-y-4" onSubmit={handleSettingsSave}>
-                        <div>
-                            <label htmlFor="title" className="block mb-2 text-sm font-medium text-slate-300">System Title</label>
-                            <input type="text" id="title" name="title" value={localSettings.title} onChange={handleSettingsChange} className="bg-slate-700 border border-slate-600 text-white text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block w-full p-2.5" />
+                    <div className="flex-grow space-y-8 flex flex-col">
+                        <form className="space-y-4" onSubmit={handleSettingsSave}>
+                            <p className="text-slate-400">Customize the title, logo, and borrowing rules of the application.</p>
+                            <div>
+                                <label htmlFor="title" className="block mb-2 text-sm font-medium text-slate-300">System Title</label>
+                                <input type="text" id="title" name="title" value={localSettings.title} onChange={handleSettingsChange} className="bg-slate-700 border border-slate-600 text-white text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block w-full p-2.5" />
+                            </div>
+                            <div>
+                                <label htmlFor="logoUrl" className="block mb-2 text-sm font-medium text-slate-300">Logo Image URL</label>
+                                <input type="text" id="logoUrl" name="logoUrl" value={localSettings.logoUrl} onChange={handleSettingsChange} className="bg-slate-700 border border-slate-600 text-white text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block w-full p-2.5" />
+                            </div>
+                            <div>
+                                <label htmlFor="loanPeriodDays" className="block mb-2 text-sm font-medium text-slate-300">Standard Loan Period (Days)</label>
+                                <input 
+                                    type="number" 
+                                    id="loanPeriodDays" 
+                                    name="loanPeriodDays" 
+                                    value={localSettings.loanPeriodDays || 7} 
+                                    onChange={handleSettingsChange} 
+                                    className="bg-slate-700 border border-slate-600 text-white text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block w-full p-2.5" 
+                                    min="1"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">Sets the default duration for borrowing items.</p>
+                            </div>
+                            <div className="flex items-center justify-end gap-4 pt-4">
+                                {saveStatus && <p className="text-sm text-green-400">{saveStatus}</p>}
+                                <button type="submit" className="flex items-center justify-center px-4 py-2 bg-emerald-600 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-700 transition-colors">
+                                    <IconDeviceFloppy />
+                                    <span>Save Settings</span>
+                                </button>
+                            </div>
+                        </form>
+
+                        <div className="pt-4 border-t border-slate-700">
+                             <h3 className="text-lg font-semibold text-white mb-2">System Notifications</h3>
+                             <p className="text-slate-400 mb-4 text-sm">Enable browser notifications for real-time alerts on new user sign-ups and item requests.</p>
+                             {renderNotificationStatus()}
                         </div>
-                        <div>
-                            <label htmlFor="logoUrl" className="block mb-2 text-sm font-medium text-slate-300">Logo Image URL</label>
-                            <input type="text" id="logoUrl" name="logoUrl" value={localSettings.logoUrl} onChange={handleSettingsChange} className="bg-slate-700 border border-slate-600 text-white text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block w-full p-2.5" />
-                        </div>
-                        <div className="flex items-center justify-end gap-4 pt-4">
-                            {saveStatus && <p className="text-sm text-green-400">{saveStatus}</p>}
-                            <button type="submit" className="flex items-center justify-center px-4 py-2 bg-emerald-600 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-700 transition-colors">
-                                <IconDeviceFloppy />
-                                <span>Save Settings</span>
-                            </button>
-                        </div>
-                    </form>
+                    </div>
                 </div>
             </div>
         </div>

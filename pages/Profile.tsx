@@ -1,4 +1,4 @@
-import React, { useState, useEffect, FormEvent } from 'react';
+import * as React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useInventory } from '../context/InventoryContext';
 import { User } from '../types';
@@ -7,12 +7,12 @@ import { IconUserCircle, IconLoader } from '../components/icons';
 export const Profile: React.FC = () => {
     const { currentUser } = useAuth();
     const { state, editUser } = useInventory();
-    const [formData, setFormData] = useState<Partial<User>>({ fullName: '', email: '' });
-    const [isSaving, setIsSaving] = useState(false);
-    const [showSuccess, setShowSuccess] = useState(false);
-    const [error, setError] = useState('');
+    const [formData, setFormData] = React.useState<Partial<User>>({ fullName: '', email: '' });
+    const [isSaving, setIsSaving] = React.useState(false);
+    const [showSuccess, setShowSuccess] = React.useState(false);
+    const [error, setError] = React.useState('');
     
-    useEffect(() => {
+    React.useEffect(() => {
         if (currentUser) {
             // Find the full user object from the state to edit, since currentUser is secure
             const fullUser = state.users.find(u => u.id === currentUser.id);
@@ -22,7 +22,7 @@ export const Profile: React.FC = () => {
         }
     }, [currentUser, state.users]);
 
-    const handleSubmit = async (e: FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         // This check is sufficient as the save button is only rendered for admins.

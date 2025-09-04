@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import * as React from 'react';
 import { QRScanner } from '../components/QRScanner';
 import { useInventory } from '../context/InventoryContext';
 import { Item } from '../types';
@@ -20,15 +20,15 @@ const InventoryProgressBar: React.FC<{ available: number; total: number }> = ({ 
 
 
 export const Search: React.FC = () => {
-    const { state, borrowItem } = useInventory();
+    const { state, requestBorrowItem } = useInventory();
     const { currentUser } = useAuth();
-    const [searchResults, setSearchResults] = useState<Item[]>([]);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [hasSearched, setHasSearched] = useState(false);
-    const [isBorrowModalOpen, setBorrowModalOpen] = useState(false);
-    const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-    const [borrowForm, setBorrowForm] = useState({ quantity: 1 });
-    const [borrowerId, setBorrowerId] = useState('');
+    const [searchResults, setSearchResults] = React.useState<Item[]>([]);
+    const [searchQuery, setSearchQuery] = React.useState('');
+    const [hasSearched, setHasSearched] = React.useState(false);
+    const [isBorrowModalOpen, setBorrowModalOpen] = React.useState(false);
+    const [selectedItem, setSelectedItem] = React.useState<Item | null>(null);
+    const [borrowForm, setBorrowForm] = React.useState({ quantity: 1 });
+    const [borrowerId, setBorrowerId] = React.useState('');
 
     const handleOpenBorrowModal = (item: Item) => {
         setSelectedItem(item);
@@ -42,25 +42,21 @@ export const Search: React.FC = () => {
     const handleBorrowSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (selectedItem && borrowerId && borrowForm.quantity > 0) {
-            const quantityToBorrow = Number(borrowForm.quantity);
-            await borrowItem({
-                itemId: selectedItem.id,
-                userId: borrowerId,
-                quantity: quantityToBorrow,
-            });
-            
-            const newSearchResults = searchResults.map(item => 
-                item.id === selectedItem.id 
-                ? { ...item, availableQuantity: item.availableQuantity - quantityToBorrow } 
-                : item
-            );
-            setSearchResults(newSearchResults);
-
-            setBorrowModalOpen(false);
+            try {
+                await requestBorrowItem({
+                    itemId: selectedItem.id,
+                    userId: borrowerId,
+                    quantity: Number(borrowForm.quantity),
+                });
+                setBorrowModalOpen(false);
+                alert('Your borrow request has been submitted for approval.');
+              } catch (error: any) {
+                alert(`Failed to request item: ${error.message}`);
+              }
         }
     };
     
-    const handleSearch = useCallback((query: string) => {
+    const handleSearch = React.useCallback((query: string) => {
         setSearchQuery(query);
         setHasSearched(true);
         setSearchResults([]);
@@ -154,7 +150,7 @@ export const Search: React.FC = () => {
                                                             disabled={item.availableQuantity === 0}
                                                             className="font-medium text-emerald-400 hover:text-emerald-300 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors"
                                                         >
-                                                            Borrow
+                                                            Request Borrow
                                                         </button>
                                                     </td>
                                                 </tr>
@@ -172,7 +168,7 @@ export const Search: React.FC = () => {
                 )}
             </div>
 
-            <Modal isOpen={isBorrowModalOpen} onClose={() => setBorrowModalOpen(false)} title={`Borrow: ${selectedItem?.name}`}>
+            <Modal isOpen={isBorrowModalOpen} onClose={() => setBorrowModalOpen(false)} title={`Request to Borrow: ${selectedItem?.name}`}>
                 <form onSubmit={handleBorrowSubmit} className="space-y-4">
                     {currentUser?.isAdmin ? (
                         <UserSearchInput selectedUserId={borrowerId} onUserSelect={setBorrowerId} />
@@ -190,7 +186,7 @@ export const Search: React.FC = () => {
                     </div>
                     <div className="flex justify-end gap-3 pt-4">
                         <button type="button" onClick={() => setBorrowModalOpen(false)} className="py-2 px-4 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors">Cancel</button>
-                        <button type="submit" disabled={!borrowerId} className="py-2 px-4 bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:bg-slate-500 disabled:cursor-not-allowed">Confirm Borrow</button>
+                        <button type="submit" disabled={!borrowerId} className="py-2 px-4 bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:bg-slate-500 disabled:cursor-not-allowed">Submit Request</button>
                     </div>
                 </form>
             </Modal>

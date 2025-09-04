@@ -1,10 +1,19 @@
 
+
+
+
 export interface Item {
   id: string;
   name: string;
   totalQuantity: number;
   availableQuantity: number;
   category: string;
+}
+
+export enum UserStatus {
+  PENDING = 'PENDING',
+  ACTIVE = 'ACTIVE',
+  DENIED = 'DENIED',
 }
 
 export interface User {
@@ -18,12 +27,22 @@ export interface User {
   section: string | null;
   role: 'Member' | 'Admin';
   isAdmin: boolean;
+  status: UserStatus;
 }
 
 export enum LogAction {
   BORROW = 'BORROW',
   RETURN = 'RETURN',
 }
+
+export enum BorrowStatus {
+  PENDING = 'PENDING',
+  ON_LOAN = 'ON_LOAN',
+  DENIED = 'DENIED',
+  RETURN_REQUESTED = 'RETURN_REQUESTED',
+  RETURNED = 'RETURNED',
+}
+
 
 export interface LogEntry {
   id: string;
@@ -32,14 +51,15 @@ export interface LogEntry {
   quantity: number;
   timestamp: string;
   action: LogAction;
+  status?: BorrowStatus; // For BORROW logs
   relatedLogId?: string; // To link a RETURN action to a BORROW action
-  returnRequested?: boolean;
+  dueDate?: string; // The calculated due date for a borrowed item
 }
 
 export interface Notification {
   id: string;
   message: string;
-  type: 'new_user' | 'return_request';
+  type: 'new_user_request' | 'return_request' | 'borrow_request';
   read: boolean;
   timestamp: string;
   relatedLogId?: string;
@@ -69,6 +89,15 @@ export interface Comment {
   timestamp: string;
 }
 
+export interface LogComment {
+  id: string;
+  logId: string; // The ID of the LogEntry it's attached to
+  userId: string; // The user (admin) who wrote it
+  text: string;
+  timestamp: string;
+}
+
+
 // FIX: Moved State interface here to be shared across modules and avoid circular dependencies.
 export interface State {
   items: Item[];
@@ -77,4 +106,5 @@ export interface State {
   notifications: Notification[];
   suggestions: Suggestion[];
   comments: Comment[];
+  logComments: LogComment[];
 }

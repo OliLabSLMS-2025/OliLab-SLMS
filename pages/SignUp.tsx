@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import * as React from 'react';
+// FIX: Updated react-router-dom imports for v5 compatibility.
+import { useHistory, Link } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import { IconOliveBranch, IconLoader } from '../components/icons';
-import { User } from '../types';
+import { User, UserStatus } from '../types';
 import { GRADE_LEVELS } from '../constants';
 import { Modal } from '../components/Modal';
 import { UserAgreement } from '../components/UserAgreement';
@@ -27,13 +28,14 @@ const initialErrorsState = {
 };
 
 export const SignUpPage: React.FC = () => {
-    const [formData, setFormData] = useState(initialFormState);
-    const [errors, setErrors] = useState(initialErrorsState);
-    const [isLoading, setIsLoading] = useState(false);
+    const [formData, setFormData] = React.useState(initialFormState);
+    const [errors, setErrors] = React.useState(initialErrorsState);
+    const [isLoading, setIsLoading] = React.useState(false);
     const { state, createUser } = useInventory();
-    const navigate = useNavigate();
-    const [isAgreementModalOpen, setAgreementModalOpen] = useState(false);
-    const [agreedToTerms, setAgreedToTerms] = useState(false);
+    // FIX: Replaced useNavigate (v6) with useHistory (v5).
+    const history = useHistory();
+    const [isAgreementModalOpen, setAgreementModalOpen] = React.useState(false);
+    const [agreedToTerms, setAgreedToTerms] = React.useState(false);
 
     const validateForm = (): boolean => {
         const newErrors = { ...initialErrorsState };
@@ -80,7 +82,7 @@ export const SignUpPage: React.FC = () => {
 
         try {
             const { ...userProfileData } = formData;
-            const newUser: Omit<User, 'id'> = {
+            const newUser: Omit<User, 'id' | 'status'> = {
                 ...userProfileData,
                 isAdmin: false, // New signups are always members
                 role: 'Member',
@@ -88,7 +90,8 @@ export const SignUpPage: React.FC = () => {
             
             await createUser(newUser);
             
-            navigate('/login', { state: { message: 'Account created successfully! Please sign in.' } });
+            // FIX: Used history.push for navigation, compatible with v5.
+            history.push('/login', { message: 'Your account is pending admin approval. You will be notified via email once it has been reviewed.' });
         } catch (err: any) {
             let errorMessage = 'An error occurred during sign up.';
             console.error("Signup error:", err);
@@ -114,22 +117,22 @@ export const SignUpPage: React.FC = () => {
     };
 
     const getInputClasses = (fieldName: keyof typeof errors) => {
-        const baseClasses = "appearance-none rounded-lg relative block w-full px-3 py-3 border bg-slate-700 text-white placeholder-slate-400 focus:outline-none focus:z-10 sm:text-sm";
+        const baseClasses = "appearance-none rounded-lg relative block w-full px-3 py-3 border bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 focus:outline-none focus:z-10 sm:text-sm";
         return errors[fieldName]
             ? `${baseClasses} border-red-500 focus:ring-red-500 focus:border-red-500`
-            : `${baseClasses} border-slate-600 focus:ring-emerald-500 focus:border-emerald-500`;
+            : `${baseClasses} border-slate-300 dark:border-slate-600 focus:ring-emerald-500 focus:border-emerald-500`;
     };
 
     return (
         <>
-            <div className="flex items-center justify-center min-h-screen bg-slate-900 py-8">
-                <div className="w-full max-w-md p-8 space-y-6 bg-slate-800 rounded-2xl shadow-2xl border border-slate-700">
+            <div className="flex items-center justify-center min-h-screen bg-slate-100 dark:bg-slate-900 py-8">
+                <div className="w-full max-w-md p-8 space-y-6 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700">
                     <div className="flex flex-col items-center">
                         <div className="p-3 bg-emerald-600 rounded-lg mb-4">
                             <IconOliveBranch />
                         </div>
-                        <h1 className="text-3xl font-bold text-white">Create Account</h1>
-                        <p className="text-slate-400">Join the OliLab System</p>
+                        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Create Account</h1>
+                        <p className="text-slate-500 dark:text-slate-400">Join the OliLab System</p>
                     </div>
                     <form className="mt-8 space-y-4" onSubmit={handleSubmit} noValidate>
                         <div>
@@ -137,35 +140,35 @@ export const SignUpPage: React.FC = () => {
                                 className={getInputClasses('fullName')}
                                 placeholder="Full Name"
                             />
-                            {errors.fullName && <p className="mt-1 text-xs text-red-400">{errors.fullName}</p>}
+                            {errors.fullName && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors.fullName}</p>}
                         </div>
                         <div>
                             <input id="username" name="username" type="text" autoComplete="username" required value={formData.username} onChange={handleChange}
                                 className={getInputClasses('username')}
                                 placeholder="Username"
                             />
-                            {errors.username && <p className="mt-1 text-xs text-red-400">{errors.username}</p>}
+                            {errors.username && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors.username}</p>}
                         </div>
                         <div>
                             <input id="email" name="email" type="email" autoComplete="email" required value={formData.email} onChange={handleChange}
                             className={getInputClasses('email')}
                                 placeholder="Email Address"
                             />
-                            {errors.email && <p className="mt-1 text-xs text-red-400">{errors.email}</p>}
+                            {errors.email && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors.email}</p>}
                         </div>
                         <div>
                             <input id="lrn" name="lrn" type="text" required value={formData.lrn} onChange={handleChange}
                             className={getInputClasses('lrn')}
                                 placeholder="Learner's Reference Number (LRN)"
                             />
-                            {errors.lrn && <p className="mt-1 text-xs text-red-400">{errors.lrn}</p>}
+                            {errors.lrn && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors.lrn}</p>}
                         </div>
                         <div className="flex gap-4">
-                            <select id="gradeLevel" name="gradeLevel" value={formData.gradeLevel ?? ''} onChange={handleChange} required className="appearance-none rounded-lg relative block w-full px-3 py-3 border border-slate-600 bg-slate-700 text-white focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm">
+                            <select id="gradeLevel" name="gradeLevel" value={formData.gradeLevel ?? ''} onChange={handleChange} required className="appearance-none rounded-lg relative block w-full px-3 py-3 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm">
                                 <option value="">Select Grade Level</option>
                                 {Object.keys(GRADE_LEVELS).map(level => <option key={level} value={level}>{level}</option>)}
                             </select>
-                            <select id="section" name="section" value={formData.section ?? ''} onChange={handleChange} required disabled={!formData.gradeLevel} className="appearance-none rounded-lg relative block w-full px-3 py-3 border border-slate-600 bg-slate-700 text-white focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm disabled:opacity-50">
+                            <select id="section" name="section" value={formData.section ?? ''} onChange={handleChange} required disabled={!formData.gradeLevel} className="appearance-none rounded-lg relative block w-full px-3 py-3 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm disabled:opacity-50">
                                 <option value="">Select Section</option>
                                 {formData.gradeLevel && GRADE_LEVELS[formData.gradeLevel].map(sec => <option key={sec} value={sec}>{sec}</option>)}
                             </select>
@@ -175,7 +178,7 @@ export const SignUpPage: React.FC = () => {
                             className={getInputClasses('password')}
                                 placeholder="Password"
                             />
-                            {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password}</p>}
+                            {errors.password && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{errors.password}</p>}
                         </div>
 
                         <div className="pt-2">
@@ -188,12 +191,12 @@ export const SignUpPage: React.FC = () => {
                                     onChange={(e) => setAgreedToTerms(e.target.checked)}
                                     className="h-4 w-4 text-emerald-600 bg-slate-700 border-slate-600 rounded focus:ring-emerald-500"
                                 />
-                                <label htmlFor="terms" className="ml-2 block text-sm text-slate-400">
+                                <label htmlFor="terms" className="ml-2 block text-sm text-slate-500 dark:text-slate-400">
                                     I have read and agree to the{' '}
                                     <button
                                         type="button"
                                         onClick={() => setAgreementModalOpen(true)}
-                                        className="font-medium text-emerald-400 hover:text-emerald-300 underline"
+                                        className="font-medium text-emerald-500 dark:text-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-300 underline"
                                     >
                                         User Agreement
                                     </button>
@@ -203,20 +206,20 @@ export const SignUpPage: React.FC = () => {
                         </div>
                         
                         {errors.general && (
-                            <p className="text-center text-sm text-red-400 animate-in fade-in-0">{errors.general}</p>
+                            <p className="text-center text-sm text-red-500 dark:text-red-400 animate-in fade-in-0">{errors.general}</p>
                         )}
 
                         <div className="pt-2">
                             <button type="submit" disabled={isLoading || !agreedToTerms}
-                                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-emerald-500 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-emerald-500 disabled:bg-slate-500 dark:disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
                             >
                                 {isLoading ? <IconLoader className="h-5 w-5" /> : 'Create Account'}
                             </button>
                         </div>
                     </form>
-                    <p className="text-center text-sm text-slate-400">
+                    <p className="text-center text-sm text-slate-500 dark:text-slate-400">
                         Already have an account?{' '}
-                        <Link to="/login" className="font-medium text-emerald-400 hover:text-emerald-300">
+                        <Link to="/login" className="font-medium text-emerald-500 dark:text-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-300">
                             Sign In
                         </Link>
                     </p>

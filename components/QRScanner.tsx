@@ -1,5 +1,4 @@
-import React, { useEffect, useRef } from 'react';
-// FIX: Removed unused 'QrCodeScanResult' type which is not an exported member of 'html5-qrcode'.
+import * as React from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 
 interface QRScannerProps {
@@ -10,9 +9,9 @@ interface QRScannerProps {
 const qrcodeRegionId = "html5qr-code-full-region";
 
 export const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure }) => {
-    const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+    const scannerRef = React.useRef<Html5QrcodeScanner | null>(null);
 
-    useEffect(() => {
+    React.useEffect(() => {
         if (!scannerRef.current) {
             const scanner = new Html5QrcodeScanner(
                 qrcodeRegionId, 
@@ -24,7 +23,6 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailu
                 /* verbose= */ false
             );
             
-            // FIX: Removed the unused 'result' parameter and its type annotation to resolve the import error.
             const handleSuccess = (decodedText: string) => {
                 scanner.clear();
                 onScanSuccess(decodedText);

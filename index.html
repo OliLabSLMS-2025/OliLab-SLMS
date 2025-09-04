@@ -5,22 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OliLab - Science Laboratory Management</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      // Configure Tailwind CSS for class-based dark mode
+      tailwind.config = {
+        darkMode: 'class',
+      }
+    </script>
     <style>
       /* For a more modern scrollbar */
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
       }
-      ::-webkit-scrollbar-track {
+      .dark ::-webkit-scrollbar-track {
         background: #1e293b;
       }
-      ::-webkit-scrollbar-thumb {
+      .light ::-webkit-scrollbar-track {
+        background: #f1f5f9;
+      }
+      .dark ::-webkit-scrollbar-thumb {
         background-color: #475569;
         border-radius: 10px;
         border: 2px solid #1e293b;
       }
-      ::-webkit-scrollbar-thumb:hover {
+      .light ::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1;
+        border-radius: 10px;
+        border: 2px solid #f1f5f9;
+      }
+      .dark ::-webkit-scrollbar-thumb:hover {
         background-color: #64748b;
+      }
+      .light ::-webkit-scrollbar-thumb:hover {
+        background-color: #94a3b8;
       }
 
       /* Print Styles */
@@ -45,10 +62,11 @@
             background-color: white !important;
             border: 1px solid #ccc !important;
         }
-        .prose-invert {
+        /* Ensure dark mode styles are overridden for printing */
+        .dark .prose-invert {
             color: black !important;
         }
-        .prose-invert h1, .prose-invert h2, .prose-invert h3, .prose-invert p, .prose-invert li {
+        .dark .prose-invert h1, .dark .prose-invert h2, .dark .prose-invert h3, .dark .prose-invert p, .dark .prose-invert li {
             color: black !important;
         }
 
@@ -128,16 +146,39 @@
     <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@18.3.1",
-    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
-    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "react": "https://esm.sh/react@18.2.0",
+    "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "react-dom": "https://esm.sh/react-dom@18.2.0",
     "react-router-dom": "https://esm.sh/react-router-dom@6.25.1",
-    "recharts": "https://esm.sh/recharts@2.12.7",
+    "recharts": "https://esm.sh/*recharts@2.12.7",
+    "clsx": "https://esm.sh/*clsx@2.1.1",
+    "lodash/": "https://esm.sh/*lodash@4.17.21/",
     "@google/genai": "https://esm.sh/@google/genai@0.14.0",
     "html5-qrcode": "https://esm.sh/html5-qrcode@2.3.8",
     "qrcode": "https://esm.sh/qrcode@1.5.3",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
-    "react/": "https://aistudiocdn.com/react@^19.1.1/"
+    "react-dom/": "https://esm.sh/react-dom@18.2.0/",
+    "react/": "https://esm.sh/react@18.2.0/",
+    "prop-types": "https://esm.sh/*prop-types@15.8.1",
+    "react-smooth": "https://esm.sh/*react-smooth@2.0.3",
+    "recharts-scale": "https://esm.sh/*recharts-scale@0.5.0",
+    "tiny-warning": "https://esm.sh/*tiny-warning@1.0.3",
+    "tiny-invariant": "https://esm.sh/*tiny-invariant@1.3.3",
+    "victory-vendor/": "https://esm.sh/*victory-vendor@36.6.11/",
+    "react-is": "https://esm.sh/react-is@18.2.0",
+    "reselect": "https://esm.sh/*reselect@5.1.1",
+    "re-reselect": "https://esm.sh/*re-reselect@4.0.0",
+    "scheduler": "https://esm.sh/*scheduler@0.23.0",
+    "react-transition-group": "https://esm.sh/*react-transition-group@4.4.5",
+    "eventemitter3": "https://esm.sh/*eventemitter3@5.0.1",
+    "d3-array": "https://esm.sh/*d3-array@3.2.4",
+    "d3-ease": "https://esm.sh/*d3-ease@3.0.1",
+    "d3-interpolate": "https://esm.sh/*d3-interpolate@3.0.1",
+    "d3-path": "https://esm.sh/*d3-path@3.1.0",
+    "d3-scale": "https://esm.sh/*d3-scale@4.0.2",
+    "d3-shape": "https://esm.sh/*d3-shape@3.2.0",
+    "dom-helpers": "https://esm.sh/*dom-helpers@5.2.1",
+    "@babel/runtime/": "https://esm.sh/*@babel/runtime@7.24.8/"
   }
 }
 </script>
