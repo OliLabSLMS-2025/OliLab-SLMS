@@ -23,17 +23,10 @@ const OverdueReminder: React.FC<{ overdueItems: { itemName: string }[] }> = ({ o
 };
 
 const StatusDisplay: React.FC<{ log: any }> = ({ log }) => {
-    const { requestItemReturn, state } = useInventory();
-    const { currentUser } = useAuth();
+    const { requestItemReturn } = useInventory();
 
-    const handleRequestReturn = async (log: LogEntry) => {
-        if (!currentUser) return;
-        const item = state.items.find(i => i.id === log.itemId);
-        if (!item) {
-            console.error("Item not found for return request");
-            return;
-        }
-        await requestItemReturn({ log, item, user: currentUser as User });
+    const handleRequestReturn = async (logEntry: LogEntry) => {
+        await requestItemReturn(logEntry);
     };
 
     switch (log.status) {

@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useInventory } from '../context/InventoryContext';
 import { Modal } from '../components/Modal';
@@ -421,7 +422,24 @@ export const Inventory: React.FC = () => {
                 </select>
                 <div>
                     <label htmlFor="totalQuantity" className="block mb-2 text-sm font-medium text-slate-300">Total Quantity</label>
-                    <input type="number" id="totalQuantity" value={itemToEdit.totalQuantity} onChange={(e) => { const newTotal = parseInt(e.target.value, 10); if (!isNaN(newTotal)) { setItemToEdit({ ...itemToEdit, totalQuantity: newTotal }); }}} min={borrowedCount} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2.5" required />
+                    <input 
+                        type="number" 
+                        id="totalQuantity" 
+                        value={itemToEdit.totalQuantity} 
+                        onChange={(e) => {
+                            const newTotal = parseInt(e.target.value, 10);
+                            if (itemToEdit && !isNaN(newTotal)) {
+                                setItemToEdit({
+                                    ...itemToEdit,
+                                    totalQuantity: newTotal,
+                                    availableQuantity: newTotal - borrowedCount,
+                                });
+                            }
+                        }}
+                        min={borrowedCount} 
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2.5" 
+                        required 
+                    />
                     <p className="text-xs text-slate-400 mt-1">Cannot be lower than the amount currently borrowed ({borrowedCount}).</p>
                 </div>
                 <div className="flex justify-end gap-3 pt-4">

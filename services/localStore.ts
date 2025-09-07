@@ -100,5 +100,3 @@ export const saveSettings = (settings: any) => {
         console.error("Could not save settings to local storage", err);
     }
 }
-
-export const generateId = (prefix: string = 'id') => `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;

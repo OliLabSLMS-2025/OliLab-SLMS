@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { IconLayoutDashboard, IconFlaskConical, IconBookText, IconUsers, IconOliveBranch, IconFileSpreadsheet, IconLogOut, IconSearch, IconUserCircle, IconLightbulb, IconChevronLeft, IconChevronRight } from './icons';
+import { IconLayoutDashboard, IconFlaskConical, IconBookText, IconUsers, IconOliveBranch, IconFileSpreadsheet, IconLogOut, IconSearch, IconUserCircle, IconLightbulb, IconChevronLeft, IconChevronRight, IconCloud, IconCloudOff, IconLoader } from './icons';
 import { useAuth } from '../context/AuthContext';
 import { useInventory } from '../context/InventoryContext';
 import { LogAction, LogStatus, SuggestionStatus, UserStatus } from '../types';
@@ -12,6 +12,51 @@ interface SidebarProps {
     isCollapsed: boolean;
     onToggle: () => void;
 }
+
+const formatTimeAgo = (date: Date | null): string => {
+    if (!date) return 'never';
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (seconds < 5) return 'just now';
+    if (seconds < 60) return `${seconds}s ago`;
+
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+};
+
+const SyncStatusIndicator: React.FC<{ isCollapsed: boolean }> = ({ isCollapsed }) => {
+    const { syncStatus, lastSynced } = useInventory();
+
+    const statusContent = useMemo(() => {
+        switch (syncStatus) {
+            case 'syncing':
+                return { icon: <IconLoader className="h-4 w-4" />, text: "Syncing...", color: "text-slate-400", title: "Saving your changes..." };
+            case 'synced':
+                return { icon: <IconCloud />, text: `Synced ${formatTimeAgo(lastSynced)}`, color: "text-green-400", title: `Last sync: ${lastSynced?.toLocaleString()}` };
+            case 'error':
+                return { icon: <IconCloudOff />, text: "Sync failed", color: "text-red-400", title: "Could not save changes. Please check your connection." };
+            default:
+                return { icon: null, text: "", color: "" };
+        }
+    }, [syncStatus, lastSynced]);
+
+    return (
+        <div 
+            title={statusContent.title}
+            className={`flex items-center gap-2 text-xs py-2 mt-2 transition-all duration-200 ${statusContent.color} ${isCollapsed ? 'justify-center' : 'px-4'}`}
+        >
+            {statusContent.icon}
+            {!isCollapsed && <span>{statusContent.text}</span>}
+        </div>
+    );
+};
 
 const memberNavItems = [
   { to: '/dashboard', text: 'Dashboard', icon: <IconLayoutDashboard /> },
@@ -131,6 +176,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
                 </>
             )}
         </button>
+        <SyncStatusIndicator isCollapsed={isCollapsed} />
       </div>
     </div>
   );
