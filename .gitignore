@@ -1,0 +1,23 @@
+# Node.js dependencies
+node_modules/
+
+# Build artifacts
+dist/
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python backend specifics
+olilab-backend/venv/
+olilab-backend/__pycache__/
+olilab-backend/*.pyc
+
+# Environment variables file (IMPORTANT FOR SECURITY)
+olilab-backend/.env
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
